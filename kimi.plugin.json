@@ -29,11 +29,11 @@
   "hooks": [
     {
       "event": "SessionStart",
-      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/announce-ars-loaded.sh\""
+      "command": "bash \"${KIMI_PLUGIN_ROOT}/scripts/announce-ars-loaded.sh\""
     },
     {
       "event": "PreToolUse",
-      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run_guard.sh\"",
+      "command": "bash \"${KIMI_PLUGIN_ROOT}/hooks/run_guard.sh\"",
       "matcher": "Write|Edit|MultiEdit|Bash"
     }
   ],

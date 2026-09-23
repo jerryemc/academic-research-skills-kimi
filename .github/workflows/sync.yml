@@ -77,6 +77,11 @@ jobs:
             "$PLUGIN_DIR/" ./
           test -f kimi.plugin.json || { echo "rsync 后仓库根缺少 kimi.plugin.json"; exit 1; }
 
+      - name: Adapt hook placeholders to Kimi runtime
+        run: |
+          # 转换器产物沿用了 ${CLAUDE_PLUGIN_ROOT}，Kimi Code 注入的是 KIMI_PLUGIN_ROOT
+          sed -i 's/\${CLAUDE_PLUGIN_ROOT}/${KIMI_PLUGIN_ROOT}/g' kimi.plugin.json
+
       - name: Bump version to <upstream>+sync.YYYYMMDD
         run: |
           BASE=$(jq -r '.version | split("+")[0]' kimi.plugin.json)
