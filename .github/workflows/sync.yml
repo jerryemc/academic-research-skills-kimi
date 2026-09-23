@@ -59,7 +59,9 @@ jobs:
       - name: Convert upstream to Kimi plugin format
         run: |
           python3 tools/kimi-sync/convert_plugin_repo.py /tmp/upstream --output-dir /tmp/converted --force
-          PLUGIN_DIR=$(dirname "$(find /tmp/converted -maxdepth 2 -name kimi.plugin.json | head -n 1)")
+          MANIFEST=$(find /tmp/converted -name kimi.plugin.json | head -n 1)
+          [ -n "$MANIFEST" ] || { echo "转换产物中找不到 kimi.plugin.json"; exit 1; }
+          PLUGIN_DIR=$(dirname "$MANIFEST")
           echo "PLUGIN_DIR=$PLUGIN_DIR" >> "$GITHUB_ENV"
 
       - name: Overwrite repo root with converted product (keep our own files)
@@ -72,6 +74,7 @@ jobs:
             --exclude /tools/ \
             --exclude /.github/ \
             "$PLUGIN_DIR/" ./
+          test -f kimi.plugin.json || { echo "rsync 后仓库根缺少 kimi.plugin.json"; exit 1; }
 
       - name: Bump version to <upstream>+sync.YYYYMMDD
         run: |
