@@ -67,6 +67,7 @@ jobs:
       - name: Overwrite repo root with converted product (keep our own files)
         run: |
           rsync -a --delete \
+            --exclude /.git/ \
             --exclude /README.md \
             --exclude /README.upstream.md \
             --exclude /LICENSE \
