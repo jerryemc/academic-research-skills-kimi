@@ -1,0 +1,42 @@
+{
+  "$schema": "https://catalog.msh.team/misc/kimi.plugin.schema.json",
+  "name": "academic-research-skills",
+  "version": "3.22.1+sync.20260923",
+  "description": "Contract-audited academic research pipeline for Claude Code: research → write → review → revise → finalize. 4 skills, 27 modes, 39 prompt roles (3 plugin-exposed agents; the rest run inline by default), v3.7.3 + v3.8 L3 claim-faithfulness gate, v3.9.0 cross-index triangulation, v3.10 triangulation policy layer, v3.11 deterministic citation verification gate (#182). Capability ceilings: docs/STAGE_CAPABILITY_MATRIX.md.",
+  "keywords": [
+    "academic",
+    "research",
+    "writing",
+    "review",
+    "deep-research",
+    "literature-review",
+    "systematic-review",
+    "peer-review",
+    "scholarly-publishing"
+  ],
+  "author": "Cheng-I Wu",
+  "license": "CC-BY-NC-4.0",
+  "homepage": "https://github.com/Imbad0202/academic-research-skills",
+  "interface": {
+    "displayName": "academic-research-skills",
+    "shortDescription": "Contract-audited academic research pipeline for Claude Code: research → write → review → revise → finalize. 4 skills, 27",
+    "longDescription": "Contract-audited academic research pipeline for Claude Code: research → write → review → revise → finalize. 4 skills, 27 modes, 39 prompt roles (3 plugin-exposed agents; the rest run inline by default), v3.7.3 + v3.8 L3 claim-faithfulness gate, v3.9.0 cross-index triangulation, v3.10 triangulation policy layer, v3.11 deterministic citation verification gate (#182). Capability ceilings: docs/STAGE_CAPABILITY_MATRIX.md.",
+    "developerName": "Cheng-I Wu",
+    "category": "PRODUCTIVITY",
+    "websiteURL": "https://github.com/Imbad0202/academic-research-skills"
+  },
+  "skills": "./skills/",
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/announce-ars-loaded.sh\""
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run_guard.sh\"",
+      "matcher": "Write|Edit|MultiEdit|Bash"
+    }
+  ],
+  "commands": "./commands/",
+  "agents": "./agents/"
+}

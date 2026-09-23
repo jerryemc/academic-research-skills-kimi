@@ -1,0 +1,95 @@
+name: sync-upstream
+
+on:
+  schedule:
+    # 每周一 07:23 UTC
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone upstream
+        run: |
+          git clone https://github.com/Imbad0202/academic-research-skills.git /tmp/upstream
+          echo "NEW_SHA=$(git -C /tmp/upstream rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: "Security gate: did upstream touch hooks/ or scripts/?"
+        id: gate
+        run: |
+          OLD_SHA=$(cat .upstream-commit 2>/dev/null || true)
+          echo "old_sha=$OLD_SHA" >> "$GITHUB_OUTPUT"
+          if [ -n "$OLD_SHA" ] && [ "$OLD_SHA" != "$NEW_SHA" ]; then
+            if ! git -C /tmp/upstream diff --quiet "$OLD_SHA" "$NEW_SHA" -- hooks scripts; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Open review issue (upstream hooks/scripts changed)
+        if: steps.gate.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLD_SHA: ${{ steps.gate.outputs.old_sha }}
+        run: |
+          if [ "$(gh issue list --state open --search 'in:title 上游 hooks' --json number --jq 'length')" != "0" ]; then
+            echo "A review issue is already open; not creating a duplicate."
+            exit 0
+          fi
+          gh issue create \
+            --title "上游 hooks/ 或 scripts/ 有改动，需人工审阅后手动同步" \
+            --body "上游从 \`$OLD_SHA\` 更新到 \`$NEW_SHA\` 时改动了 \`hooks/\` 或 \`scripts/\`，自动同步已暂停。\n\n改动对比：https://github.com/Imbad0202/academic-research-skills/compare/$OLD_SHA...$NEW_SHA\n\n请人工审阅这些脚本（它们会以 bash 形式在会话事件中自动执行），确认无误后到 Actions 页面手动 Run workflow 完成同步。"
+
+      - name: Stop when review is required
+        if: steps.gate.outputs.changed == 'true'
+        run: |
+          echo "Upstream hooks/scripts changed; auto-sync paused. See the created issue."
+          exit 0
+
+      - name: Convert upstream to Kimi plugin format
+        run: |
+          python3 tools/kimi-sync/convert_plugin_repo.py /tmp/upstream --output-dir /tmp/converted --force
+          PLUGIN_DIR=$(dirname "$(find /tmp/converted -maxdepth 2 -name kimi.plugin.json | head -n 1)")
+          echo "PLUGIN_DIR=$PLUGIN_DIR" >> "$GITHUB_ENV"
+
+      - name: Overwrite repo root with converted product (keep our own files)
+        run: |
+          rsync -a --delete \
+            --exclude /README.md \
+            --exclude /README.upstream.md \
+            --exclude /LICENSE \
+            --exclude /.upstream-commit \
+            --exclude /tools/ \
+            --exclude /.github/ \
+            "$PLUGIN_DIR/" ./
+
+      - name: Bump version to <upstream>+sync.YYYYMMDD
+        run: |
+          BASE=$(jq -r '.version | split("+")[0]' kimi.plugin.json)
+          jq --arg v "${BASE}+sync.$(date -u +%Y%m%d)" '.version = $v' kimi.plugin.json > kimi.plugin.json.tmp
+          mv kimi.plugin.json.tmp kimi.plugin.json
+
+      - name: Record upstream SHA
+        run: echo "$NEW_SHA" > .upstream-commit
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes since last sync; nothing to push."
+          else
+            git commit -m "Sync upstream academic-research-skills @ $NEW_SHA"
+            git push
+          fi
