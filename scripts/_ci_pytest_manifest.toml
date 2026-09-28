@@ -61,6 +61,10 @@ id = "v3.10-firm-rules-sync"
 path = "scripts/test_check_firm_rules_sync.py"
 
 [[pytest]]
+id = "892-routing-core-sync"
+path = "scripts/test_check_routing_core_sync.py"
+
+[[pytest]]
 id = "v3.10-policy-layer"
 path = "scripts/test_check_v3_10_policy.py"
 
@@ -695,3 +699,11 @@ path = "scripts/test_file_lock.py"
 [[pytest]]
 id = "862-output-language-pair-contract"
 path = "scripts/test_output_language_pair.py"
+
+[[pytest]]
+id = "887-run-ledger"
+path = "scripts/test_run_ledger.py"
+
+[[pytest]]
+id = "849-acronym-check"
+path = "scripts/test_check_acronyms.py"

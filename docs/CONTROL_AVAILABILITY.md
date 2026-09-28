@@ -36,8 +36,9 @@ applying your channel's channel-wide limitation above.
 |---|---|---|---|---|---|---|---|
 | Methodology layer (the four skills' `SKILL.md` protocols) | Active | Active | Active | Active | Conditional | Active | Active |
 | Skill auto-routing (trigger keywords → skill activation) | Active | Active | Active | Active | Absent | Conditional | Conditional |
+| Cross-skill routing discipline (routing core: route directly or ask which workflow, #133 / #892) | Conditional ⁽⁸⁾ ⁽⁹⁾ | Conditional ⁽⁹⁾ | Active ⁽⁹⁾ | Conditional ⁽⁹⁾ | Absent | Conditional ⁽⁹⁾ | Conditional ⁽⁹⁾ |
 | `/ars-*` slash commands | Active ⁽¹⁾ | Absent | Absent | Absent | Absent | Absent | Conditional |
-| SessionStart announce + update reminder | Conditional ⁽⁸⁾ | Absent ⁽³⁾ | Absent ⁽³⁾ | Absent | Absent | Absent | Absent |
+| SessionStart announce, update reminder, and compaction handoff reminder | Conditional ⁽⁸⁾ | Absent ⁽³⁾ | Absent ⁽³⁾ | Absent | Absent | Absent | Absent |
 | Write-scope guard (`PreToolUse` hook) | Conditional ⁽²⁾ | Absent ⁽³⁾ | Absent ⁽³⁾ | Absent | Absent | Absent | Absent |
 | Plugin agents with tools allowlist (#514) ⁽⁴⁾ | Active | Absent ⁽³⁾ | Absent ⁽³⁾ | Absent | Absent | Absent | Absent |
 | Subagent orchestration (Task-tool multi-agent dispatch) | Active | Active | Active | Absent | Absent | Absent | Conditional |
@@ -82,6 +83,8 @@ runtime graceful-degradation mechanisms is
    the plugin channel (the plugin root is the repo snapshot) and repo clones; for a
    skills-copy install, keep the original clone — the copied skill folders alone cannot
    run them. On Pi, they work if Python and the repo are present (`pi/README.md`).
+   The pipeline's run ledger (`scripts/run_ledger.py`, #887) has the same conditions;
+   where they are not met, the orchestrator says that no ledger is kept.
 6. Note-5 conditions, plus a transport: provider API credentials and `curl` for the
    general transports, or — for the citation-only calls — a Codex CLI
    ChatGPT-subscription login (`ARS_CROSS_MODEL_TRANSPORT=codex`). All transports sit
@@ -101,7 +104,29 @@ runtime graceful-degradation mechanisms is
 8. The SessionStart hook is launched through `bash`, so on Windows it needs Git Bash
    (the same PowerShell limitation as the guard launcher); its update-reminder path
    additionally needs `curl`, stays silent on any failure, and is disabled entirely by
-   `ARS_UPDATE_CHECK=0` (SETUP Method 0).
+   `ARS_UPDATE_CHECK=0` (SETUP Method 0). After a compaction or a resume, the announce
+   adds one sentence asking the session to run the pipeline's handoff check against the
+   run ledger (#887); the sentence is a reminder and runs no check itself.
+9. The routing core (Routing Discipline Steps 0-3 and the #133 anti-pattern; canonical
+   file [`shared/references/routing_core.md`](../shared/references/routing_core.md))
+   decides whether a request goes straight to a skill or the user is first asked which
+   workflow they want. Claude Code loads this repository's `.claude/CLAUDE.md` only for
+   sessions started inside the checkout, so the core also rides in the SessionStart
+   announce and in each skill's `SKILL.md` (#892). **Plugin:** before any skill loads,
+   through the announce (note-8 conditions), and again once a skill loads. **Repo clone:**
+   from `.claude/CLAUDE.md` at session start, and from `SKILL.md`. **Skills copy:** at
+   session start from the project's `.claude/CLAUDE.md` when it carries the merged ARS
+   text, as SETUP Method 1 instructs for a project install (a merged copy does not update
+   with ARS). **Skills copy without that text (a global install, or the step skipped),
+   Cowork, Claude Science, Pi port:** only after a skill has loaded, from its `SKILL.md`: a
+   request that no skill picks up gets no routing guard, and a clarifying question can
+   come only after a skill call. As with note 7, these are prompt-level instructions, not
+   runtime enforcement. The #133 routing fixtures were run with the plugin loaded, in
+   sessions started inside and outside the checkout; outside it, Claude Fable 5.1 still
+   failed one fixture (a mid-message `[direct-mode]` token), and fixture 05 passed on both
+   models only under two scoring readings
+   ([`CALIBRATION_LOG.md`](../tests/fixtures/issue_133_routing/CALIBRATION_LOG.md)). The
+   other channels are covered only by the copy check (`scripts/check_routing_core_sync.py`).
 
 ## Environment degradations within a channel
 

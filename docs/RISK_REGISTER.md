@@ -76,8 +76,19 @@ instructions that an agent follows as if they came from the user.
 
 - **Existing controls**: the retrieved-content instruction/data boundary as a
   standing principle (#367), inlined verbatim in the deep-research retrieval
-  agents and, since #883, in the revision coach that ingests pasted reviewer
-  comments and decision letters (`scripts/check_instruction_data_boundary.py`);
+  agents; since #883, in the revision coach that ingests pasted reviewer
+  comments and decision letters; and since #890, in twelve agents on the
+  dispatch and passport-import paths (the pipeline orchestrator, the integrity
+  gates, literature intake, reviewer Phase 0 and the editorial synthesis,
+  systematic-review risk of bias, temporal extraction, and deep-research
+  `review` mode) and in two prompts a model receives without the agent file,
+  the claim-audit judge prompt and the cross-model devil's advocate prompt;
+  since #894, in five agents that read third-party text through their own tool
+  calls (the formatter, citation compliance, and the three citation emitters),
+  in the single-reference verification prompt the integrity gates send to a
+  cross-model verifier on the API route, and in the four `SKILL.md` files,
+  which every install path loads when a skill runs
+  (`scripts/check_instruction_data_boundary.py` lists each);
   the reviewer-side untrusted-materials rule (`academic-paper-reviewer/SKILL.md`)
   and its manuscript fence in the five panel agents (pinned by
   `scripts/check_reviewer_data_fences.py`); the offline structural probe
@@ -94,8 +105,23 @@ instructions that an agent follows as if they came from the user.
   message, but acted on them in 0 of 105 attempts when the same text arrived as a
   tool result (§6.5.1; rates and product-side caveats in
   `audits/harness-retirement-2026-09-opus-5-5.md` DG-1). The #675 scenarios
-  include pasted reviewer and committee comments. The prompt-level boundary is
-  trust-based; its effect on this regression is unmeasured.
+  include pasted reviewer and committee comments. The prompt-level boundary,
+  including the interim #890 and #894 extensions, is trust-based; its effect on
+  this regression is unmeasured, and #676 stays open with its structural
+  requirements unmet. The inventories, ranking, and placement are in
+  `docs/design/2026-09-23-890-instruction-data-boundary-extension.md` (#890)
+  and `docs/design/2026-09-24-894-instruction-data-boundary-tool-calls.md`
+  (#894). Surfaces they leave uncovered: agents whose dispatch carries
+  third-party text only as quotations inside artifacts from covered agents
+  (for example `meta_analysis_agent` and `argument_builder_agent`); agents
+  whose input is the user's own text or dialogue; the advisory
+  collaboration-depth observer and monitoring agent; the cross-model result at
+  the design-freeze checkpoint; requests a fallback model serves; the
+  ChatGPT-subscription transport's instructions to the verifier; and the
+  routing decision a session makes before it loads a `SKILL.md`. The #675 seed
+  runs one generic guided prompt rather than any agent's prompt, so as seeded
+  it evaluates none of these paths; a measured claim for a path needs a #675
+  scenario that loads that agent's assembled prompt.
 
 ### R4 — Unpublished-content exposure via cross-model transport
 
@@ -233,3 +259,31 @@ subagent as a broader authorization than was given.
   (evidence mapped in `audits/harness-retirement-2026-09-model-update.md` G-1 for
   Fable 5.1 and `audits/harness-retirement-2026-09-opus-5-5.md` DM-013 for Opus
   5.5); the prompt rule is trust-based.
+
+### R12 — Handoff loss across compaction and subagent returns
+
+Context compaction or a subagent return drops a pending checkpoint decision, the
+researcher's exact words, a partly collected answer, a step's outcome, or a transient
+input, and the run continues as if its record were complete. Loss and fabrication fail
+differently: fabricating a decision is R11's risk; this row covers losing one.
+
+- **Existing controls**: the run ledger beside the passport and its deterministic
+  report (`scripts/run_ledger.py`, schema
+  `shared/contracts/passport/run_ledger.schema.json`); the orchestrator's run-ledger
+  and handoff-check rules (`academic-pipeline/agents/pipeline_orchestrator_agent.md`)
+  and the state machine's run-ledger rule
+  (`academic-pipeline/references/pipeline_state_machine.md`); the SessionStart
+  reminder after a compaction or resume (`scripts/announce-ars-loaded.sh`); the opt-in
+  passport reset for MANDATORY decisions
+  (`academic-pipeline/references/passport_as_reset_boundary.md`).
+- **Evidence status**: `NOT_RUN` (asserted here; no capability-matrix row) — how the
+  report reads a ledger is CI-pinned by six synthetic scenarios, and the handoff-check
+  block it renders in English and Traditional Chinese by line-exact tests (#898,
+  `scripts/test_run_ledger.py`); whether the orchestrator writes the entries and inserts
+  the block unchanged is not measured on any session model.
+- **Residual gap**: anything lost before its entry is written cannot be recovered; the
+  hashes catch accidental damage, not deliberate edits, a lost tail, or a restored older
+  copy of the ledger
+  (`docs/design/2026-09-23-887-handoff-integrity-design.md`, section 6); the
+  collaboration observer still needs the original turns; outside the plugin channel the
+  reminder runs only if the user wires the hook (`docs/CONTROL_AVAILABILITY.md`, note 3).

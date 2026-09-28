@@ -9,7 +9,14 @@ A suite of Claude Code skills for rigorous academic research, paper writing, pee
 | `deep-research` v2.12.1 | 13-agent research team | full, quick, socratic, review, lit-review, three-way-scan, fact-check, systematic-review |
 | `academic-paper` v3.3.1 | 12-agent paper writing | full, plan, outline-only, revision, revision-coach, abstract-only, lit-review, format-convert, citation-check, disclosure, rebuttal-audit |
 | `academic-paper-reviewer` v1.11.1 | Multi-perspective paper review (5 reviewers + optional cross-model DA critique) | full, re-review, quick, methodology-focus, guided, calibration |
-| `academic-pipeline` v3.22.1 | Full pipeline orchestrator | (coordinates all above) |
+| `academic-pipeline` v3.22.2 | Full pipeline orchestrator | (coordinates all above) |
+
+## v3.22.2 Key Additions (run ledger and handoff check + acronym check + wider instruction/data boundary + routing and front-page repairs)
+
+- **A run ledger backs the handoff after compaction, resume, and subagent returns (#887, #898).** When a run has a passport file, the orchestrator appends the user's initial instructions, checkpoint questions and answers in the user's exact words, step receipts, and file hashes to `<passport-stem>_run_ledger.yaml` through `scripts/run_ledger.py` (schema `shared/contracts/passport/run_ledger.schema.json`). `report` compares the ledger with what a summary or report claims, renders the handoff check in English or Traditional Chinese, and re-checks file digests. `docs/RISK_REGISTER.md` adds R12 and `docs/DATA_FLOWS.md` lists the new local store, which holds the user's exact words. Synthetic scenarios pin the report; whether the orchestrator writes the entries is prompt-level and unmeasured.
+- **A deterministic acronym check (#849, proposed by @reiropke in #848).** `scripts/check_acronyms.py` reports undefined, late, or duplicate acronym definitions per scope without calling a model. The prompts have the calling session run it on saved drafts and abstracts, and a review appends its report to the Editorial Decision Letter as an advisory attachment that the decision, the revision roadmap, and re-review criteria do not draw on. Tests use synthetic fixtures; whether runs call it is unmeasured.
+- **The instruction/data boundary reaches dispatches, passport imports, tool-call receivers, and the main session (#890, #894).** Seventeen more agents and the four `SKILL.md` files inline the canonical block, pinned by `scripts/check_instruction_data_boundary.py`; the opt-in claim-audit judge prompt changes with it, so cached verdicts from the old prompt are not reused. The layer is prompt-level and unmeasured.
+- **Routing and front-page repairs (#892, #889, #897, #854, #888, #908).** The routing core reaches plugin and skills-copy installs through `shared/references/routing_core.md`; explicit requests stay explicit when the mode's usual input is missing; `/ars-lit-review` stays in its mode; the revision coach keeps peer review out of the committee-correspondence variant; "authoritative" skill output is scoped to deliverable ownership; and the front page and showcase match their sources. Routing results come from one session per fixture, a smoke test rather than a rate.
 
 ## v3.22.1 Key Additions (Opus 5.5 model currency + citation-check loading and Chinese APA 7 repairs + Pi wrapper fix)
 
@@ -320,12 +327,16 @@ Spec: `docs/design/2026-05-17-ars-v3.9.0-cross-index-triangulation-measurement-s
 
 **Routing precedence:** This section runs BEFORE Routing Rules 1-5. Once this section settles on a destination, Rules 1-5 apply within that destination's skill family.
 
-**Step 0 — Escape hatch check (before any classification):** If the user's first message begins with `[direct-mode]` (case-insensitive byte-0 token, optionally preceded by whitespace/newlines that are stripped on parse), record this fact, strip the prefix and surrounding whitespace from the message, and skip directly to **Step 1 explicit-intent handling** on the stripped content. The literal `[direct-mode]` is NOT passed through to the dispatched agent. If the stripped message itself has no clear skill named, Step 1 falls through to Step 3 clarification (the escape hatch bypasses cross-phase clarification (Step 2), not all routing).
+The routing core below is the same block as `shared/references/routing_core.md`, which carries it to plugin installs (SessionStart announce) and to every install path (the four `SKILL.md` files), because Claude Code loads this file only for sessions started inside the checkout (#892). `scripts/check_routing_core_sync.py` keeps the copies identical.
+
+<!-- routing-core:begin -->
+**Step 0 — Escape hatch check (before any classification):** If the user's first message begins with `[direct-mode]` (case-insensitive byte-0 token, optionally preceded by whitespace/newlines that are stripped on parse), record this fact, strip the prefix and surrounding whitespace from the message, and skip directly to **Step 1 explicit-intent handling** on the stripped content. The literal `[direct-mode]` is NOT passed through to the dispatched agent. If the stripped message itself has no clear skill named, Step 1 falls through to Step 3 clarification (the escape hatch bypasses cross-phase clarification (Step 2), not all routing). When the token is honored and the named agent or skill needs inputs the message does not supply, read that agent's or skill's file and ask for what it requires, in its terms. Without the byte-0 token, naming an agent is not explicit intent: such a message goes through Steps 1-3 like any other, so cross-phase materials still get Step 2 clarification.
 
 Otherwise, classify the user's input:
 
 1. **Explicit clear intent** — user invokes a specific skill via `/ars-*` slash command, or uses an unambiguous trigger keyword that maps to a single skill (e.g., "lit-review this", "review my paper", "draft an abstract"):
    → Route directly; no clarification, no orchestrator detour.
+   → The request stays explicit when the mode's usual input is absent or a word in it has other everyday senses. A revision request with no reviewer comments is revision mode's "feel certain sections need improvement" case, and "revisar artículo" is the reviewer's trigger. Route to that mode and let the mode handle what is missing; do not reopen the choice of workflow.
 
 2. **Cross-phase materials detected** — user provides artifacts spanning ≥ 2 pipeline phases without naming a specific skill (e.g., pre-written abstract + pre-collected literature; full draft + reviewer comments + bibliography):
    → **Clarify**. Do NOT auto-route to a single-phase agent. List candidate workflows as a-d options in markdown body (NOT via AskUserQuestion tool). See `shared/references/intent_clarification_protocol.md` for the message template.
@@ -335,6 +346,7 @@ Otherwise, classify the user's input:
    → Clarify per `shared/references/intent_clarification_protocol.md`.
 
 **Anti-pattern (caused #133):** Receiving ambiguous cross-phase materials and silently auto-routing to a single-phase agent based on which phase the materials "look closest to." This bypasses orchestrator-level reconciliation and lets the subagent inherit the full ambiguity without independent oversight.
+<!-- routing-core:end -->
 
 **Forward note (v3.10):** Active conductor (#134) will reframe this gate as structured intake with task envelope dispatch. v3.9.2 ships clarification-only as interim hot-fix.
 
@@ -387,7 +399,7 @@ Materials: Complete paper text. field_analyst_agent auto-detects domain and conf
 Materials: Editorial Decision Letter, Revision Roadmap, Per-reviewer detailed comments
 
 ## Version Info
-- **Suite version**: 3.22.1 (per CHANGELOG.md)
-- **Last Updated**: 2026-09-23
+- **Suite version**: 3.22.2 (per CHANGELOG.md)
+- **Last Updated**: 2026-09-25
 - **Author**: Cheng-I Wu
 - **License**: CC-BY-NC 4.0
