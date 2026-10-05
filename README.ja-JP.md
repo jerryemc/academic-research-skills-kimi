@@ -1,6 +1,6 @@
 # Claude Code 向け Academic Research Skills
 
-[![Version](https://img.shields.io/badge/version-v3.22.2-blue)](https://github.com/Imbad0202/academic-research-skills/releases/tag/v3.22.2)
+[![Version](https://img.shields.io/badge/version-v3.23.0-blue)](https://github.com/Imbad0202/academic-research-skills/releases/tag/v3.23.0)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20696614-blue)](https://doi.org/10.5281/zenodo.20696614)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Sponsor](https://img.shields.io/badge/sponsor-Buy%20Me%20a%20Coffee-orange?logo=buy-me-a-coffee)](https://buymeacoffee.com/crucify020v)
@@ -65,7 +65,7 @@ v3.3 は [**PaperOrchestra**](https://arxiv.org/abs/2604.05018)（Song, Song, Pf
 
 **👉 [docs/DATA_FLOWS.md](docs/DATA_FLOWS.md)** — どのデータがマシンの外に出るか（書誌 resolver、明示的な同意を要するオプションのクロスモデル呼び出し、更新チェック）、ローカルキャッシュの内容と保持期間、各経路の無効化方法。（英語）
 
-**Claude Science をお使いですか？** 4 つのスキルは直接インポートできます: **Skills → Import from GitHub** で `https://github.com/Imbad0202/academic-research-skills` を貼り付け、**Preview** → **Import 4 skills**（本リポジトリ v3.14.0+ が必要 — インポーターは marketplace manifest に明示されたスキルパスを読み取ります）。インポートはその時点のスナップショットです: ARS の更新後は再インポートしてください。インポートされたスキルは ARS の方法論（研究・執筆・査読プロトコル）を伝えます。Claude Code 固有の仕組み — slash commands、hooks、サブエージェントオーケストレーション — は移行されません。詳細は [docs/SETUP.md](docs/SETUP.md) の Method 5 を参照。
+**Claude Science をお使いですか？** 5 つのスキルは直接インポートできます: **Skills → Import from GitHub** で `https://github.com/Imbad0202/academic-research-skills` を貼り付け、**Preview** → **Import**（本リポジトリ v3.14.0+ が必要 — インポーターは marketplace manifest に明示されたスキルパスを読み取ります）。インポートはその時点のスナップショットです: ARS の更新後は再インポートしてください。インポートされたスキルは ARS の方法論（研究・執筆・査読プロトコル）を伝えます。Claude Code 固有の仕組み — slash commands、hooks、サブエージェントオーケストレーション — は移行されません。詳細は [docs/SETUP.md](docs/SETUP.md) の Method 5 を参照。
 
 **Pi を使用していますか？** `pi install git:github.com/Imbad0202/academic-research-skills` で、リポジトリ内のコミュニティ管理 wrapper をインストールできます。元の ARS コンテンツを正本として維持し、Pi 固有のオーケストレーションと hook の制限を明記しています。詳細は [`pi/README.md`](pi/README.md) を参照してください。
 
@@ -88,6 +88,7 @@ v3.3 は [**PaperOrchestra**](https://arxiv.org/abs/2604.05018)（Song, Song, Pf
 - **Academic Paper** — 12 エージェントの論文執筆。Style Calibration、Writing Quality Check、LaTeX ハードニング、可視化、改訂コーチング、引用変換、アンチリーケージプロトコル、VLM 図表検証付き。
 - **Academic Paper Reviewer** — 基準ごとの証拠に紐づくナラティブ判断を行う 7 エージェントの多視点ピアレビュー（Journal-Fit Reviewer + 3 動的レビュアー + Devil's Advocate）、譲歩閾値プロトコル、攻撃強度保持、オプションのクロスモデル DA 批評/キャリブレーション、R&R トレーサビリティマトリクス、read-only 制約。現在の live review は常に `NOT_CALIBRATED` で、full calibration は有界な候補 profile のみを生成し、live review への適用は未実装です。
 - **Academic Pipeline** — 10 ステージのパイプラインオーケストレーター。適応的チェックポイント、主張検証、Material Passport、オプションの `repro_lock`、オプションのクロスモデル整合性検証、会話中強化、基準ごとのナラティブな退行チェック付き（型付き軌跡キャリアは未実装）。
+- **SR-Screener** — システマティック・スコーピング・ラピッドレビューのための、ユーザーが確定したプロトコルに基づく文献スクリーニング：盲検化された 2 名の AI レビュアーと第三レビュアーによる裁定、順序付きの除外コード、既定値による判定なし、再開可能なバッチ実行、QC（シード研究、ニアミス再確認、kappa と PABAK）、PRISMA 2020 の数値、EndNote/Zotero 用 RIS グループ、`academic-paper` への `literature_corpus[]` 引き継ぎ。AI の判定は意思決定の支援であり、最終確認はレビューチームが行います。
 - **Data Access Level Metadata**（v3.3.2+）— 各スキルが `data_access_level`（`raw` / `redacted` / `verified_only`）を宣言。`scripts/check_data_access_level.py` で強制。Anthropic の automated-w2s-researcher（2026）から適応されたパターン。[`shared/ground_truth_isolation_pattern.md`](shared/ground_truth_isolation_pattern.md) を参照。
 - **Task Type Annotation**（v3.3.2+）— 各スキルが `task_type`（`open-ended` または `outcome-gradable`）を宣言。現在の ARS スキルはすべて `open-ended`。
 - **Benchmark Report Schema**（v3.3.5+）— 誠実なベンチマーク比較のための JSON Schema + lint。[`shared/benchmark_report_pattern.md`](shared/benchmark_report_pattern.md) を参照。
@@ -209,6 +210,19 @@ You: "status"
 
 > パイプラインは **Stage 6: Process Summary** で終了します — 6 次元の Collaboration Quality Evaluation（1-100 採点）付きの論文作成プロセスレコードを自動生成します。
 
+#### SR-Screener（8 モード）
+
+```
+"Turn my proposal into a screening protocol"          → protocol モード
+"Is this abstract eligible for my review?"            → quick モード（単一レビュアーのトリアージ）
+"Pilot the screening with my seed studies"            → pilot モード
+"Screen these database exports"                       → ta-screen モード
+"Screen the full texts of the advanced records"       → ft-screen モード
+"Adjudicate the conflicts in my Rayyan export"        → adjudicate モード
+"Double-check my exclusions"                          → audit モード
+"Give me the PRISMA numbers for the screening"        → report モード
+```
+
 ### サポート言語
 
 - **繁體中文** — ユーザーが中国語で書く場合のデフォルト
@@ -254,9 +268,13 @@ You: "status"
 
 基準ごとの証拠に紐づく **ナラティブ判断** を行う 7 エージェントの多視点レビュー。モード: full、re-review、quick、methodology-focus、guided、calibration。現在の live review と Schema 6 package は常に `NOT_CALIBRATED` で、full calibration は有界な候補 profile のみを生成し、live review への適用は未実装です。固定総得点を Accept / Minor Revision / Major Revision / Reject に対応させません。初回レビューパネル vs. 契約管理された再レビューディスパッチの境界: ARCHITECTURE.md §3 Stage 3 / Stage 3' を参照。
 
-### Academic Pipeline（v3.22.2）
+### Academic Pipeline（v3.23.0）
 
 整合性検証、二段階レビュー、ソクラテス式コーチング、コラボレーション評価を持つ 10 ステージのオーケストレーター。パイプラインのルール（エージェントが従うプロトコルであり、実行時の保証ではない）: 各ステージにユーザー確認チェックポイントが必要。整合性検証（Stage 2.5 + 4.5）は MANDATORY であり、記録されないバイパス経路は存在しない（すべてのオーバーライドは Stage 6 のためにユーザーの理由の記録を要する）。R&R Traceability Matrix（Schema 11）は各査読コメントを著者の改訂主張に対応づけ、再審査でそれが検証されたかどうかを記録する。v3.4 は Stage 2.5 / 4.5 に Compliance Agent（PRISMA-trAIce + RAISE）を追加した。v3.5 はすべての FULL/SLIM チェックポイントとパイプライン完了時に **Collaboration Depth Observer**（`collaboration_depth_agent`、advisory のみ — 決してブロックしない）を追加する。MANDATORY 整合性ゲート（2.5 / 4.5）は、コンプライアンスチェックが希薄化されないよう observer を明示的にスキップする。Wang & Zhang（2026）, IJETHE 23:11 に基づく。エージェント、成果物、ゲートを含むステージごとのマトリクス: ARCHITECTURE.md §3 を参照。
+
+### SR-Screener（v1.0.0）
+
+`deep-research`（問い、プロトコル、検索）と `academic-paper`（レビュー論文の執筆）の間を担う 4 エージェントの文献スクリーニング。モード: protocol、quick、pilot、ta-screen、ft-screen、adjudicate、audit、report。盲検化された 2 つのレビュアー subagent（Read と Grep のみ）がユーザー確定済みのプロトコルで全レコードを判定し、第三レビュアーが「進める vs. 除外」の不一致を裁定します。標準ライブラリのみの Python スクリプトが RIS / PubMed .nbib / Web of Science / CSV エクスポートの解析、重複除去、バッチ化、統合を行い、スクリーニングログ、RIS グループ、PRISMA 2020 の数値、`[TO COMPLETE]` 欄付きの方法セクション草稿、`literature_corpus[]` ファイルを生成します。エージェントが従うルール（実行時の保証ではありません）: ユーザーがプロトコルを確定するまでスクリーニングしない、失敗した呼び出しを既定の「除外」にしない、数値を報告する前にレビューチームが判定を確認する。詳細は [`sr-screener/SKILL.md`](sr-screener/SKILL.md)。
 
 ---
 
@@ -339,6 +357,10 @@ https://github.com/Imbad0202/academic-research-skills
 
 ここには直近 3 リリースのみを掲載しています。完全な更新履歴は英語版の [CHANGELOG.md](CHANGELOG.md) を参照してください。v3.21.2 までの日本語版リリース要約は [docs/changelog-archive/ja-JP.md](docs/changelog-archive/ja-JP.md) に凍結保存され、以後更新されません。
 
+### v3.23.0 (2026-10-03) — 5 つ目の skill `sr-screener`、パイプラインの机上ウォークスルーによる修正、証拠と台帳の強化
+
+> **skill を 1 つ追加し、パイプライン実行を最初から最後まで読み通して見つかった動作上の問題を修正、プロンプト層の変更は効果未測定、`sr-screener` はスクリーニング精度を主張しない:** v3.23.0 は 5 つ目の skill `sr-screener` を追加します（#919、@erfanz97 による貢献）。レビューのプロトコルをユーザーが確認する適格基準に変換し、互いの判断を知らない 2 つのレビュアー subagent と裁定者 1 名で、タイトル・抄録と全文をスクリーニングします。テストは合成レコードを使い、スプレッドシート出力では数式テキストを無効化します（#951）。既定のパイプライン実行を机上でたどったウォークスルー（#925〜#929）により、既定の実行は次のように変わりました。v3.6.7 Audit Artifact Gate はオプトインになり、論文が自身の実験を報告しているかを研究者に一度だけ尋ね、実行全体に設定した制約はユーザーの原文どおり保存され、適用される後続の各ディスパッチに引用され（審査ステージではチェックポイントで適用）、インテグリティ・ゲートは 1 つのルールに従ってペイウォールの向こうの文献を注記として扱い、Stage 5 と 6 は求められたファイルだけを作り、オプトインのスイッチは Stage 5 で拒否される項目を Stage 4.5 で示します。Stage 2.5 と 4.5 のチェックポイントは orchestrator が指定したフォルダから証拠行を再生し（#933、#947、#948）、ゲートが捏造と判定した文献は以後の改訂に入らず（#936）、台帳の読み取り処理は解析エラーをファイルの内容を引用せずに報告します（#898、#945）。小さな変更: 読解出力が個々の文献の方法がどの条件で歪むかを述べること（#916）、文献レビューの形式は著者が決めることを固定の時点で伝える注記（#921）、生成側に合わせた Schema 1（#938）、session のモデルを引き継ぐ `/ars-citation-check`（#912）。
+
 ### v3.22.2 (2026-09-25) — 実行台帳と引き継ぎチェック、略語チェック、instruction/data 境界の拡大、ルーティングとトップページの修正
 
 > **2 つの決定論的チェックは合成テストで固定、プロンプト層の変更は効果未測定:** v3.22.2 は実行台帳を追加します（#887）。パイプラインに passport ファイルがある場合、orchestrator はユーザーの最初の指示、各チェックポイントの質問とユーザーの原文どおりの回答、ステップの受領記録、ファイルのハッシュを、passport の隣にあるローカルの台帳に追記します。compaction、再開、subagent の返却の後には、`scripts/run_ledger.py report` が台帳と要約やレポートの主張を照合し、差異を一覧にします。このスクリプトは現在、引き継ぎチェックを英語または繁体字中国語で自ら出力し、エントリを書き込む時点でそのエントリが指すファイルのハッシュを計算します（#898）。台帳にはユーザーの原文が保存されるため、`docs/DATA_FLOWS.md` にこのファイルと削除方法を記載しています。本リリースは `scripts/check_acronyms.py` も追加します（#849、@reiropke の提案）。モデルを呼び出さずに、未定義の略語、初出より後で定義された略語、二重に定義された略語を報告します。プロンプトは保存済みの草稿と要旨に対して呼び出し側がこれを実行するよう指示し、査読では報告を Editorial Decision Letter の最後に参考用の添付として付けます。査読の判定、改訂ロードマップ、再査読の基準はこの添付を根拠にしません。両スクリプトは合成テストで固定されていますが、実際の実行で台帳が書き込まれるか、チェックが呼び出されるかは未測定です。instruction/data 境界は、ディスパッチと passport 取り込みに含まれる第三者のテキスト（#890）、受け手が自身のツール呼び出しで読むテキスト、各 skill のメイン session（#894）に広がりました。lint がすべての写しを固定していますが、効果は未測定です（オプトインの claim-audit 判定プロンプトもこれに伴って変わり、古いプロンプトのキャッシュ判定は再利用されません）。修正: ルーティングの中核が plugin と skills コピーのインストールにも届きます（#892）。モードの通常の入力がなくても、明示的な依頼は明示的なまま扱います（#889）。`/ars-lit-review` は実行中の作業を別のワークフローに誘導しなくなりました（#897）。改訂コーチは査読を委員会往復のバリアントに回さなくなりました（#854）。orchestrator は「権威ある」skill 出力の意味を成果物の帰属に限定しました（#888）。トップページと showcase の記述は出典と一致しました（#908）。ルーティングの結果は fixture ごとに 1 session の初期確認であり、率ではありません。台帳を記述する schema が 1 つ追加されましたが、既存の schema、コマンドのモデル、推論強度の設定は変わっていません。
@@ -346,7 +368,3 @@ https://github.com/Imbad0202/academic-research-skills
 ### v3.22.1 (2026-09-23) — モデル現況の整合（Opus 5.5）、citation-check の読み込みと中国語 APA 7 の修正、Pi ラッパーの修正
 
 > **モデル現況の整合と修復、新しいプロンプト層の防御は効果未測定:** v3.22.1 は、2 つのモデルがそれぞれ Opus 5.5 system card を通読した監査を経て、Claude Opus 5.5 を Claude Fable 5.1 と並ぶサポート対象の session モデルとします。監査で退役したガードレールはありません（#883）。ドキュメントには、推論強度（effort）の指針（Claude Code は Opus 5.5 を `medium` で開始するため、重いタスクでは `high` 以上を推奨）、両モデル共通の定価換算、そして階層の説明（ラダーの順序はベンダーの製品ラインの順序であり、能力の順位ではない）を加えました。card によると、Opus 5.5 は従来のモデルより貼り付けテキスト内の指示に従いやすいため、revision coach は貼り付けられた査読者・委員会のテキストをデータとして扱うようになり、lint で固定されています。このプロンプト層の防御の効果は未測定です。モード読み込みと引用チェックも修復しました: 13 個の plugin モードコマンドが名前空間付きのコア skill を直接呼び出し、同梱の参照ファイルを plugin ルートから解決することで、citation-check の読み込みが復旧します（#857）。中国語 APA 7 チェックは本文中の著者略称の欠落を検出し、曖昧さの例外と参考文献リストの著者欄を完全なまま保ち、画数順の逆転の証拠がある場合にのみ並べ替えを提案します（#882）。引用チェック全般も、目に見える構文エラーと未検証の解決・出典の主張を区別するようになりました（#882）。英語・繁体字中国語・韓国語のトリガー語を追加して citation-check へ振り分け、CI で各 skill の説明を 1,024 コードポイント以内に制限します（#858、#864）。Pi ラッパーは文字列配列形式の system prompt を受け付けます（#880）。スキーマ、コマンドのモデル、effort 設定の変更はありません。
-
-### v3.22.0 (2026-09-16) — 出力言語ペア契約、ロケール・トラック、plugin eval スイート、Windows／トランスポート修正
-
-> **加わるのは構造、証拠は境界付きのまま:** v3.22.0 では、レジストリをキーとする Schema 4 フィールドで 1 回の実行が出力言語ペアを宣言でき、フィールドが無い場合は従来のファイルがそのまま再現されます（#862 Phase 1、PR #869）。その周囲にロケール・トラックを整えました: @didacrios による es-ES README と保守的なトリガー語、コミュニティ管理のロケールパック方針と単独オーナーの暫定申請ルートです。2 つの `claude plugin eval` スイート（revision-coach、citation-check）と reviewer-calibration harness は回帰ガードと dispatch 基盤としてのみ出荷され、測定された向上や校正値は主張しません。修正: `/ars-mark-read` と残り 5 つのロック箇所が共通の `msvcrt` バックエンドで Windows 上で動作、OpenAI リクエストは GPT-6 Astra が拒否するパラメータを送らない、隔離された Codex トランスポートは `effort=ultra` を拒否、監査の出所に実際のジャッジの識別を記録、ソクラテス経路 F6 は方向を事前選択しない、根拠のない主張は hedge では救済されない。README は直近 3 リリースのみ保持し、Gartenberg ら、Wang・Li らが human-in-the-loop アンカーに加わりました。Roadmap Phase 4（ステージ別の証拠上限）は本リリースでは未提供で、期間は繰り越されます。
