@@ -1,379 +1,578 @@
-# Academic Research Skills for Claude Code
+# ARS-Codex
 
-[![Version](https://img.shields.io/badge/version-v3.22.1-blue)](https://github.com/Imbad0202/academic-research-skills/releases/tag/v3.22.1)
-[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20696614-blue)](https://doi.org/10.5281/zenodo.20696614)
+[![Version](https://img.shields.io/badge/version-v3.24.0-blue)](VERSION)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20784820-blue)](https://doi.org/10.5281/zenodo.20784820)
 [![Sponsor](https://img.shields.io/badge/sponsor-Buy%20Me%20a%20Coffee-orange?logo=buy-me-a-coffee)](https://buymeacoffee.com/crucify020v)
 
-[简体中文版](README.zh-CN.md) | [繁體中文版](README.zh-TW.md) | [日本語版](README.ja-JP.md) | [한국어](README.ko-KR.md) | [Español](README.es-ES.md)
+**Languages:** [English](README.md) · [简体中文](README_ZH-CN.md) · [繁體中文](README_ZH-TW.md) · [日本語](README_JA.md)
 
-A comprehensive suite of Claude Code skills for academic research, covering the full pipeline from research to publication.
+ARS-Codex is the Codex-native sibling of
+[Academic Research Skills (ARS) for Claude Code](https://github.com/Imbad0202/academic-research-skills).
+It is a separate Codex distribution with its own plugin identity, packaging,
+and runtime adapter. Its release number follows the vendored ARS suite.
 
-**Install in 30 seconds** (Claude Code CLI / VS Code / JetBrains, v3.7.0+):
-
-```text
-/plugin marketplace add Imbad0202/academic-research-skills
-/plugin install academic-research-skills
-```
-
-Then try `/ars-plan` to walk through your paper structure via Socratic dialogue, or jump to [Quick install](#quick-install) for prerequisites and the traditional symlink flow.
-
-> **AI is your copilot, not the pilot.** This tool won't write your paper for you. It handles the grunt work — hunting down references, formatting citations, verifying data, checking logical consistency — so you can focus on the parts that actually require your brain: defining the question, choosing the method, interpreting what the data means, and writing the sentence after "I argue that."
->
-> Unlike a humanizer, this tool doesn't help you hide the fact that you used AI. It helps you write better. Style Calibration learns your voice from past work. Writing Quality Check catches the patterns that make prose feel machine-generated. The goal is quality, not cheating.
-
-### Why human-in-the-loop, not full automation?
-
-Lu et al. (2026, *Nature* 651:914-919) built **The AI Scientist** — the first fully autonomous AI research system to publish a paper through blind peer review at a top-tier ML venue (ICLR 2025 workshop, score 6.33/10 vs workshop average 4.87). Their Limitations section enumerates the failure modes that any fully-autonomous AI research pipeline inherits: implementation bugs, hallucinated results, shortcut reliance, bug-as-insight reframing, methodology fabrication, frame-lock, citation hallucinations.
-
-ARS is built on the premise that **a human researcher augmented by AI avoids these failure modes better than either alone**. Stage 2.5 and Stage 4.5 integrity gates run a 7-mode blocking checklist (see [`academic-pipeline/references/ai_research_failure_modes.md`](academic-pipeline/references/ai_research_failure_modes.md)); the reviewer offers an opt-in calibration mode that measures its own FNR/FPR against a user-supplied gold set.
-
-[**Zhao et al.**](https://arxiv.org/abs/2605.07723) (2026-05) audited 111M references across 2.5M papers on arXiv, bioRxiv, SSRN, and PMC. Their conservative estimate is 146,932 hallucinated citations for 2025 alone, with an observed mid-2024 inflection; for the bioRxiv-to-PMC pairing they report 85.3% preprint-to-published persistence. The paper describes "real citations deployed to support claims the cited references do not actually make" as an open challenge. ARS v3.7.1 added trust-chain frontmatter for source provenance; v3.7.3 added locator infrastructure (three-layer citation anchors) for future claim-level audits and surfaces advisory risk signals at cite time (ARS labels the claim-faithfulness gap internally as "L3"; this is ARS terminology, not the paper's). v3.7.x is motivated by Zhao et al.'s corpus-scale findings; corpus-scale evaluation of ARS itself remains future work.
-
-v3.8 closes the second half of the L3 gap. v3.7.3 made every citation carry a locator anchor; v3.8 adds an opt-in audit pass (`ARS_CLAIM_AUDIT=1`) that fetches the cited source against each anchor and judges whether the claim is actually supported. Five new HIGH-WARN classes (claim-not-supported, negative-constraint-violation, fabricated-reference, anchorless, constraint-violation-uncited) gate-refuse output through the formatter terminal hard gate. Calibration is shipped as a 20-tuple gold set with FNR<0.15 + FPR<0.10 acceptance thresholds; ramp-on plan is deferred to post-calibration evidence per v3.8 spec §5.
-
-[**Ren et al.**](https://arxiv.org/abs/2607.13104) (2026, *Self-Improvements in Modern Agentic Systems: A Survey*) supplies a third, survey-level anchor. Its scientific-discovery synthesis (§7.4) concludes that discovery agents cannot easily verify novelty, correctness, or reproducibility on their own and may exploit weak proxies instead, must manage evidence across heterogeneous tools and literature, and raise governance issues — "scientific writing can also amplify misinformation when the evidence is weak." Its generation-loop chapters (§5.1–§5.2) list human auditing and retained human anchors among the practical safeguards for self-generated evaluation loops, and its historical chapter (§2.2) records the oldest form of the same lesson: the practical success of Lenat's EURISKO depended heavily on the user serving as the external evaluation signal, pruning unproductive heuristic drift — a limitation the survey notes persists in modern agentic systems. ARS cites the survey as design rationale for its human-in-the-loop stance, not as empirical proof that human-in-the-loop pipelines outperform autonomous ones; the survey's actionable deltas for ARS are tracked in #539–#541 and #547–#550.
-
-[**Gartenberg et al.**](https://doi.org/10.1287/orsc.2026.ed.v37.n3) (2026, *Organization Science* 37(3):795-812, "More versus better") supplies a fourth anchor, and the first from the journal side. The *Organization Science* AI Task Force scored every first submission (6,957) and every text-format review (10,389) the journal received between January 2021 and February 2026 with a commercial AI-writing classifier and standard readability indices. Manuscripts scored as heavily AI-written read worse on those indices and were desk-rejected more often; reviews scored as more AI-written leaned toward theory and away from data; and the editors conclude that current AI tools, amplified by publish-or-perish incentives, "appear to be pushing the system toward an equilibrium of more rather than better research." Their §5 contrasts "cognitive surrender" (Shaw & Nave, 2026, as cited there) with human-first use and asks authors to disclose how a manuscript was produced. The evidence is observational, aggregate, and from one journal, and the classifier is a proprietary instrument. ARS cites the editorial as design rationale for recording volume as a non-goal (see `POSITIONING.md`) and for the Collaboration Depth Observer and the claim-strength ladder, not as evidence about ARS output; the actionable deltas are tracked in #829–#833.
-
-[**Wang, Li et al.**](https://arxiv.org/abs/2609.07713) (2026-09, *The Emerging AI Paper-Review Arms Race: Adversarial Co-Evolution in Scholarly Publishing*, a survey of 230 sources) supplies a fifth anchor, and the first that treats research production and peer review as one coupled system. Its evaluative-authority ladder (§4.1) runs from author-facing feedback through reviewer assistance and official AI reviews to scoring and decision support, with the survey's point that capability at one rung does not justify use at the next; ARS's simulated panel sits on the lowest rung by design (see `POSITIONING.md`). Two of its findings shape the reviewer roadmap. First, as the survey summarizes Dycke & Gurevych (2026, §4.5), 391 edits that break a paper's scientific support relations produced no statistically significant difference in the tested automated reviewers' aspects, sentiment, or scores compared with 540 soundness-neutral controls, while presentation-only rewrites with the science held fixed moved AI-review scores (§5.2); the survey's §9.2 conclusion is that a static evaluation can overstate an AI reviewer's reliability once authors can observe and adapt to it. ARS tracks the corresponding Round-1 paired controls in #871 and the author-identity-cue controls (§7.2) in #872; both are measurements, not new mechanisms. Second, its §9.1 cites Brodeur et al. (2026, *PNAS* 123(22):e2524747123), a randomized study in which 288 researchers in 103 teams reproduced published quantitative social-science results under three conditions: human-only, AI-assisted (ChatGPT as a collaborative tool), and AI-led (ChatGPT with minimal human oversight). Human-only and AI-assisted teams reproduced 94% and 91%, AI-led teams 37%, and the AI-assisted teams detected fewer major coding errors than the human-only teams. In that study, then, AI assistance did not verify better than humans alone and AI-led verification did much worse; ARS reads this as a reason to keep verification human-led at every checkpoint, not as evidence that its own checkpoints or integrity gates are effective. The survey is a synthesis rather than an experiment, its structured search stops at 2026-07-01 and the later targeted update did not rerun every query (§10), its deployment evidence is concentrated in a small number of AI/CS conferences, OpenReview-based settings, and selected journals, and its "arms race" framing is a lens, not a finding; ARS cites it as design rationale, not as evidence about ARS output.
-
-v3.3 was inspired by [**PaperOrchestra**](https://arxiv.org/abs/2604.05018) (Song, Song, Pfister & Yoon, 2026, Google): Semantic Scholar API verification, anti-leakage protocol, VLM figure verification, and revision-trajectory tracking. ARS now implements that last idea through categorical, evidence-anchored criterion trajectories rather than score deltas.
-
----
-
-## Architecture & pipeline
-
-**👉 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the full pipeline view: flow diagram, stage-by-stage matrix, data-access flow, skill dependency graph, quality gates, and mode list.
-
-The architecture doc supersedes the sprawling pipeline description that used to live here. Everything about *what runs in which stage* now lives in one place.
-
-## Quick install
-
-**Prerequisites**
-
-- [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) (latest; plugin packaging requires recent versions)
-- `ANTHROPIC_API_KEY` exported, or set on first `claude` run
-- *Optional:* Pandoc for DOCX, tectonic + Source Han Serif TC for APA 7.0 PDF (Markdown output works without either)
-- *Optional (real Python):* needed only for the write-scope guard and a few opt-in commands; the core skills are prompt-driven. Details, including the Windows notes on Git Bash and the Microsoft Store Python stub, are in [docs/SETUP.md § Python (optional)](docs/SETUP.md#python-optional).
-
-> **Which controls are active in *your* install channel?** Availability varies by install channel. See the per-channel map: [docs/CONTROL_AVAILABILITY.md](docs/CONTROL_AVAILABILITY.md).
-
-**Plugin install (v3.7.0+, recommended):**
+This repository vendors the ARS workflow content as a single Codex skill:
 
 ```text
-/plugin marketplace add Imbad0202/academic-research-skills
-/plugin install academic-research-skills
+skills/academic-research-suite/
+  SKILL.md
+  manifest.json
+  agents/openai.yaml
+  codex/
+    full-runtime-manifest.json
+    agents/
+    hooks/
+    scripts/
+  ars/
+    deep-research/
+    academic-paper/
+    academic-paper-reviewer/
+    academic-pipeline/
+    sr-screener/
+    experiment-agent/
+    commands/
+    hooks/
+    docs/
+    tests/
+    shared/
 ```
 
-**Verify it works:** run `/ars-plan` and describe a paper you're working on — ARS will start a Socratic dialogue to map out chapter structure. For a single-shot test instead, try `/ars-lit-review "your topic"`.
+The original Claude Code ARS checkout is not modified. Upstream content is copied
+from verified upstream release commits and adapted through the Codex router in
+`skills/academic-research-suite/SKILL.md`.
 
-**👉 [docs/SETUP.md](docs/SETUP.md)** — full guide: install Claude Code, set up API keys, optional Pandoc/tectonic for DOCX/PDF, cross-model verification (`ARS_CROSS_MODEL`), and six installation methods (Plugin, project skills, global skills, claude.ai Project, repo-cloned, Claude Science import).
+## Relationship to Claude Code ARS
 
-**👉 [docs/DATA_FLOWS.md](docs/DATA_FLOWS.md)** — what leaves your machine (bibliographic resolvers, optional consent-gated cross-model calls, the plugin update check), what is cached locally, for how long, and how to turn each path off.
+This repository is ARS-Codex. For the original Claude Code ARS distribution, use
+[Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills).
 
-**👉 [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md)** — the standing risks the suite knows about, which existing controls address each one, the evidence status behind those controls, and what remains open.
+Use the Claude Code repo when you want the native Claude Code skill layout,
+Claude-specific agent-team behavior, or the original ARS development history.
+Use this repo when you want the Codex-native single-suite skill.
 
-**Using Claude Science?** The four skills import directly: **Skills → Import from GitHub**, paste `https://github.com/Imbad0202/academic-research-skills`, **Preview**, then **Import 4 skills** (requires v3.14.0+ of this repo — the importer reads the explicit skill paths in the marketplace manifest). Imports are point-in-time snapshots: re-import after ARS updates. Imported skills carry the ARS methodology (research / writing / review protocols); Claude Code-specific machinery — slash commands, hooks, subagent orchestration — does not transfer. See [docs/SETUP.md](docs/SETUP.md) Method 5 for details.
+## Versioning
 
-**Using Pi?** Install the in-tree, community-maintained wrapper with `pi install git:github.com/Imbad0202/academic-research-skills`. It keeps the original ARS content authoritative and documents Pi-specific orchestration and hook limitations. See [`pi/README.md`](pi/README.md).
+This ARS-Codex package is version `3.24.0`. The repo-root `VERSION` file,
+`skills/academic-research-suite/SKILL.md` metadata version, and
+`skills/academic-research-suite/manifest.json` `adapter_version` track the
+Codex package version in step with the vendored ARS suite, starting at `3.22.0`.
+Earlier `0.1.x` release numbers remain historical. The exact upstream version,
+tag, and commit are recorded in `manifest.source_repositories[]`.
 
-**Using Codex CLI?** Install the sibling distribution instead: [`Imbad0202/academic-research-skills-codex`](https://github.com/Imbad0202/academic-research-skills-codex) — same workflow content, Codex-native packaging as a single `$academic-research-suite` skill with `ars-*` aliases.
+Package-level changes are summarized in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Third-party platforms and integrations** that wrap or host ARS are listed in [THIRD_PARTY.md](THIRD_PARTY.md) — community-submitted and not reviewed or endorsed by the maintainer.
+The vendored ARS source tracks **v3.24.0** at
+`Imbad0202/academic-research-skills@b34c63f828b3535f403079a4f42bc7955da2f64b`.
+This release adds two advisory attachments to the Editorial Decision Letter.
+The suggested-reference check looks up the works that Reviewer 2 and Reviewer 3
+recommend; in Codex it runs only when you ask for it, because it queries four
+bibliographic indexes. The reviewer claim check asks one isolated worker of the
+active Codex model whether the manuscript contradicts each panel finding. It is
+on by default, and `ARS_PANEL_CLAIM_CHECK=0` turns it off. Neither attachment
+changes the decision or the revision roadmap, and their accuracy on real
+reviews is unmeasured. Integrity-rule repairs treat a prior report as fresh
+only when it is under 24 hours old, and a revised paper entering at Stage 5
+runs Stage 4.5 first. The guard-launcher and startup-notice fixes remain
+inactive Claude references in Codex. There is no new workflow, and the native
+Codex model policy is unchanged.
+The output-language-pair registry still supports only `zh-tw-en`; Spanish
+triggers do not install a Spanish output-locale pack. Claude model audits and
+plugin eval suites are reference material and do not change the Codex model
+policy or establish measured Codex performance.
+Nested upstream `.github/` workflows and root `agents/` mirrors are preserved
+for traceability and self-tests, but are not repo-level CI or Codex entrypoints;
+Claude/plugin loader files under `.claude/` and `.claude-plugin/` remain
+intentionally excluded.
 
-**Governance:** who decides, what cross-model review does and does not provide, and the project's end-of-life posture are stated in [GOVERNANCE.md](GOVERNANCE.md); security reporting and triage in [SECURITY.md](SECURITY.md).
+## Models and execution
 
-## Performance & cost
+This checkout's [project configuration](.codex/config.toml) selects `gpt-6-astra`
+with `xhigh` reasoning for new trusted Codex sessions. Installing the skill does
+not copy that project setting or change an already-running session. The planner
+suggests `medium` for routine work and `xhigh` for complex work; these are
+starting policies, not measured optimal settings. `ultra` is optional in Codex
+for explicitly chosen demanding work and is rejected by the contained citation
+transport.
 
-**👉 [docs/PERFORMANCE.md](docs/PERFORMANCE.md)** — per-mode token budgets, full-pipeline estimate (~$4–6 for a 15k-word paper), and recommended Claude Code settings (Auto mode; Agent Team optional).
+Native adaptive execution is the default: use bounded subagents for independent
+work when useful and let the lead continue with other work. The fixed
+full-runtime topology and hooks remain opt-in. Read the
+[model runtime policy](skills/academic-research-suite/codex/model-runtime-policy.md)
+and [system-card alignment audit](skills/academic-research-suite/codex/audits/2026-09-06-model-alignment.md).
 
-## Guides & articles
+## Install ARS-Codex Plugin
 
-- [Academic Writing Shouldn't Be a Solo Act](https://open.substack.com/pub/edwardwu223235/p/academic-writing-shouldnt-be-a-solo?r=4dczl&utm_medium=ios) — full pipeline walkthrough (English)
-- [學術寫作不該是一個人的事：一套開源 AI 協作工具如何改變研究者的工作流](https://open.substack.com/pub/edwardwu223235/p/ai?r=4dczl&utm_medium=ios) — 完整使用指南（繁體中文）
+Add the GitHub marketplace and install ARS-Codex with Codex CLI:
 
----
-
-## Features at a glance
-
-- **Deep Research** — 13-agent research team with Socratic guided mode, PRISMA systematic review, intent detection, dialogue health monitoring, optional cross-model DA, Semantic Scholar API verification.
-- **Academic Paper** — 12-agent paper writing with Style Calibration, Writing Quality Check, LaTeX hardening, visualization, revision coaching, citation conversion, anti-leakage protocol, and VLM figure verification.
-- **Academic Paper Reviewer** — 7-agent multi-perspective peer review with criterion-bound, evidence-anchored narrative judgements (Journal-Fit Reviewer + 3 dynamic reviewers + Devil's Advocate), concession threshold protocol, attack intensity preservation, optional cross-model DA critique / calibration, R&R traceability matrix, read-only constraint. Current live reviews remain `NOT_CALIBRATED`; full calibration produces a bounded candidate profile, while live-profile application is not yet wired.
-- **Academic Pipeline** — 10-stage pipeline orchestrator with adaptive checkpoints, claim verification, Material Passport, optional `repro_lock`, optional cross-model integrity verification, mid-conversation reinforcement, and narrative criterion-by-criterion regression checks (the typed trajectory carrier is deferred).
-- **Data Access Level Metadata** (v3.3.2+) — every skill declares `data_access_level` (`raw` / `redacted` / `verified_only`); enforced by `scripts/check_data_access_level.py`. Pattern adapted from Anthropic's automated-w2s-researcher (2026). See [`shared/ground_truth_isolation_pattern.md`](shared/ground_truth_isolation_pattern.md).
-- **Task Type Annotation** (v3.3.2+) — every skill declares `task_type` (`open-ended` or `outcome-gradable`). All current ARS skills are `open-ended`.
-- **Benchmark Report Schema** (v3.3.5+) — JSON Schema + lint for honest benchmark comparisons. See [`shared/benchmark_report_pattern.md`](shared/benchmark_report_pattern.md).
-- **Artifact Reproducibility Lockfile** (v3.3.5+) — optional `repro_lock` sub-block on Material Passport. **Configuration documentation, not replay guarantee** — LLM outputs are not byte-reproducible. See [`shared/artifact_reproducibility_pattern.md`](shared/artifact_reproducibility_pattern.md).
-- **Model Tiering** (#517, v3.16+) — optional `ARS_MODEL_TIERING` switch with two directions: `economy` (execution-type agents dispatch one tier below the session model, floor Opus-class) and `quality-boost` (judgment-type agents at integrity gates and final review step up to the frontier tier). Default unset = byte-equivalent to pre-#517 behavior. See [`shared/model_tiering.md`](shared/model_tiering.md).
-- **Canonical Cross-Model Handoff Envelope** (#527, v3.17+) — the owner→dispatcher→owner blind-checkpoint transport path (#523) now has a machine-stable `[CROSS-MODEL-HANDOFF v1]` envelope with a normative Python grammar (`scripts/cross_model_handoff.py`) instead of prose-only enforcement, pinning agreement/divergence/malformed-result routing across all three checkpoint owners. See [`shared/cross_model_verification.md`](shared/cross_model_verification.md) §"Cross-model handoff envelope".
-- **Experiment Provenance Intake** (#260) — optional `experiment_provenance[]` on the Material Passport records experiments the scholar ran **externally** (ARS never runs experiments), and manuscript claims join to them via `claim_intent_manifest.planned_experiment_ids[]`. The integrity gate (Stage 2.5/4.5) audits each experiment-backed claim against declared provenance — `ALIGNED` / `OVERSTATED` / `NOT_SUPPORTED_BY_PROVENANCE` / `PROVENANCE_INSUFFICIENT` — **without judging whether the experiment itself was correct**. A fail-closed `experiment_intake_declaration` makes "did you run experiments?" an explicit Stage 1 decision (even literature-only runs declare `no_experiments_declared`). See [`shared/handoff_schemas.md`](shared/handoff_schemas.md) §"Experiment Provenance Intake (#260)".
-
-**Integrity and verification boundary:** ARS checks the manuscript and the reported process—including citation existence, claim–source alignment, reported methodology, declared experiment–result alignment, figure/table fidelity, and reporting/process/package conformance. Some checks are sampled or LLM-mediated. ARS does **not** establish that procedures were actually performed, raw data are authentic, or results reproduce; a consistently reported fabrication can pass these checks. See [POSITIONING.md § Integrity checks and the empirical-work boundary](POSITIONING.md#integrity-checks-and-the-empirical-work-boundary).
-
----
-
-## Showcase: real pipeline output
-
-See the complete artifacts from a real 10-stage pipeline run — peer review reports, integrity verification reports, and the final paper:
-
-**[Browse all pipeline artifacts →](examples/showcase/)**
-
-| Artifact | Description |
-|---|---|
-| [Final Paper (EN)](examples/showcase/full_paper_apa7.pdf) | APA 7.0 formatted, LaTeX-compiled |
-| [Final Paper (ZH)](examples/showcase/full_paper_zh_apa7.pdf) | Chinese version, APA 7.0 |
-| [Integrity Report — Pre-Review](examples/showcase/integrity_report_stage2.5.pdf) | Stage 2.5: caught 15 fabricated refs + 3 statistical errors |
-| [Integrity Report — Final](examples/showcase/integrity_report_stage4.5.pdf) | Stage 4.5: zero regressions confirmed |
-| [Peer Review Round 1](examples/showcase/stage3_review_report.pdf) | Journal-Fit Reviewer + 3 Reviewers + Devil's Advocate |
-| [Re-Review](examples/showcase/stage3prime_rereview_report.pdf) | Verification after revisions |
-| [Peer Review Round 2](examples/showcase/stage3_review_report_r2.pdf) | Follow-up review |
-| [Response to Reviewers](examples/showcase/response_to_reviewers_r2.pdf) | Point-by-point author response |
-| [Post-Publication Audit Report](examples/showcase/post_publication_audit_2026-03-09.pdf) | Independent full-reference audit: found 21/68 issues missed by 3 rounds of integrity checks |
-
----
-
-## Companion: Experiment Agent
-
-If your research involves running experiments (code or human studies) before writing, the [Experiment Agent](https://github.com/Imbad0202/experiment-agent) skill fills the gap between ARS Stage 1 (RESEARCH) and Stage 2 (WRITE).
-
-```
-ARS Stage 1 RESEARCH  →  RQ Brief + Methodology Blueprint
-        ↓
-  experiment-agent     →  run/manage experiments → validate results
-        ↓
-ARS Stage 2 WRITE     →  write paper with verified experiment results
+```bash
+codex plugin marketplace add Imbad0202/academic-research-skills-codex --ref main
+codex plugin add ars-codex@ars-codex
 ```
 
-**What it does**: executes code experiments (Python, R, etc.) with real-time monitoring, manages human study protocols with IRB ethics checklist, interprets statistics with 11-type fallacy detection, and verifies reproducibility.
+To update a plugin install later:
 
-**How to use together**: pause the ARS pipeline after Stage 1, run experiments in a separate experiment-agent session, then bring the results (with Material Passport) back to ARS Stage 2. ARS requires zero modification. See the [experiment-agent README](https://github.com/Imbad0202/experiment-agent) for setup instructions.
+```bash
+codex plugin marketplace upgrade ars-codex
+codex plugin add ars-codex@ars-codex
+```
 
-**Stage 1 intake declaration (#260)**: at Stage 1, ARS detects whether the run will carry experiment-backed claims and sets a fail-closed `experiment_intake_declaration` on the Material Passport. If you ran experiments externally, the scholar enters one `experiment_provenance[]` entry per experiment (`experiment_id`, nested `repro_lock`, `planned_vs_executed[]`, `negative_results[]`, `known_limitations[]`) and the declaration is set to `experiments_declared`; if not, it is set to `no_experiments_declared`. The declaration is **required on every post-#260 passport** — a run that touches no experiments still declares `no_experiments_declared`, so the integrity gate can never be silently bypassed by a forgotten provenance block. The `experiment_id`s are frozen at this intake point; the writers later reference them via `planned_experiment_ids[]`.
+**Windows update recovery:** if failed updates repeatedly create
+`marketplace-upgrade-*` directories or fill the system drive, stop retrying and
+open the [local marketplace recovery guide](docs/windows-marketplace-recovery.md).
+If the drive is full, first follow its step 1 to stop Codex and free space
+safely. Codex CLI 0.164.0 includes upstream fixes that clean up leftover staging
+directories, so then check the CLI version bundled with Codex Desktop and update
+if it is older. If leftover directories still accumulate on 0.164.0 or later,
+continue with the guide: it covers preserving a working copy, switching only ARS
+to a local source, verification, and manual updates. After switching to a local source, use that
+guide's manual update procedure instead of `marketplace upgrade`. Disabling the
+plugin alone is insufficient: Codex can still refresh files for disabled
+configured plugins. The guide is a workaround for [#43](https://github.com/Imbad0202/academic-research-skills-codex/issues/43);
+the Windows `os error 5` failure reported there has not been retested on 0.164.0.
 
-**Teaching-side companion**: [Teaching Skills](https://github.com/YujxZJCN/teaching-skills) applies the ARS architecture (skill ensembles, shared contracts, staged gates, a Course Passport) to the teaching side of academic life — course design → lessons → assessment → delivery → reflection; its `sotl` mode hands classroom-inquiry projects off to ARS deep-research / academic-paper for the publication phase.
+In Codex Desktop, you can alternatively add the repository from **Plugins** and
+then install **ARS-Codex**:
 
----
+```text
+Marketplace source: https://github.com/Imbad0202/academic-research-skills-codex.git
+Branch/ref: main
+Plugin: ars-codex
+```
+
+The plugin root is `plugins/ars-codex/`. Its `skills/` directory contains a
+materialized copy of `academic-research-suite`, not a symlink. This keeps
+Codex Desktop installs portable on Windows, where plugin caches may materialize
+symlinks as plain text files and skip bundled skill registration.
+
+Open a new Codex conversation after installation, then invoke
+`$academic-research-suite` or describe an academic research task that matches
+the bundled workflow.
+
+## Direct Skill Install Or Update
+
+As an alternative to the plugin, install the skill directly from this repo
+path. Use `--method git` so public and
+credentialed GitHub access both work consistently:
+
+```bash
+python3 "$HOME/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
+  --repo Imbad0202/academic-research-skills-codex \
+  --ref main \
+  --path skills/academic-research-suite \
+  --method git
+```
+
+On macOS and many Linux systems, Python 3 is exposed as `python3` rather than
+`python`. If your system only has a `python` command and it is Python 3, use
+`python` in the commands instead.
+
+To update an existing install:
+
+```bash
+rm -rf "$HOME/.codex/skills/academic-research-suite"
+python3 "$HOME/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
+  --repo Imbad0202/academic-research-skills-codex \
+  --ref main \
+  --path skills/academic-research-suite \
+  --method git
+```
+
+Open a new Codex conversation after installation. Existing Codex sessions may
+keep their old skill cache; you do not need to close unrelated Claude or Codex
+sessions.
+
+Verify with `/skills`: you should see one ARS-Codex entry,
+`academic-research-suite` or `ARS-Codex`. You should **not** see separate `academic-paper`,
+`academic-pipeline`, `deep-research`, or `academic-paper-reviewer` skills from
+this package. If you do, reinstall with the update command above and open a new
+Codex conversation.
+
+## Codex Docs
+
+- [Codex setup](skills/academic-research-suite/ars/docs/SETUP.md) covers
+  installation, `ars-*` aliases, optional tools, Material Passport adapters,
+  and unsupported Claude plugin features.
+- [Codex architecture](skills/academic-research-suite/ars/docs/ARCHITECTURE.md)
+  explains the logical ARS pipeline with the Codex runtime overlay.
+- [Optional full-runtime adapter](CODEX_FULL_RUNTIME_ADAPTER.md) documents the
+  disabled-by-default planner, Codex agent-team templates, and hook pack.
 
 ## Usage
 
-### Quick Start
+Invoke the suite explicitly with `$academic-research-suite` (singular), then
+describe the research task and provide any source files, notes, draft text,
+reviewer comments, or output constraints.
 
-```
-# Start a full research pipeline
-You: "I want to write a research paper on AI's impact on higher education QA"
-
-# Start with Socratic guidance
-You: "Guide my research on AI in educational evaluation"
-
-# Write a paper with guided planning
-You: "Guide me through writing a paper on demographic decline"
-
-# Review an existing paper
-You: "Review this paper" (then provide the paper)
-
-# Check pipeline status
-You: "status"
+```text
+Use $academic-research-suite to help me plan a systematic literature review on
+AI adoption in higher education quality assurance.
 ```
 
-### Individual Skills
+The Codex adapter routes the request to one of six ARS workflows:
 
-#### Deep Research (8 modes)
+| Workflow | Use when you need | Example prompt |
+|---|---|---|
+| `deep-research` | Research question refinement, literature review, systematic review, meta-analysis, fact-checking | `Use $academic-research-suite to build a systematic review protocol for AI in higher education QA.` |
+| `academic-paper` | Paper outline, drafting, abstract, revision, citation formatting, AI disclosure | `Use $academic-research-suite to turn these notes into an IMRaD paper outline and drafting plan.` |
+| `academic-paper-reviewer` | Manuscript review, simulated peer review, editorial decision, re-review | `Use $academic-research-suite to review this manuscript and produce a journal-style decision letter.` |
+| `academic-pipeline` | End-to-end research-to-paper workflow with integrity gates, review, revision, and final checks | `Use $academic-research-suite to run an end-to-end research-to-paper pipeline from topic to revised manuscript.` |
+| `sr-screener` | Explicitly requested protocol rules, title/abstract or full-text screening, adjudication, audit, and reporting | `Use $academic-research-suite: sr-screener ta-screen these records against my confirmed protocol.` |
+| `experiment-agent` | Code experiment planning, human study protocol, statistical interpretation, reproducibility validation | `Use $academic-research-suite to plan a code experiment and define reproducibility checks.` |
 
-```
-"Research the impact of AI on higher education"       → full mode
-"Give me a quick brief on X"                          → quick mode
-"Do a systematic review on X with PRISMA"             → systematic-review mode
-"Guide my research on X"                              → socratic mode (guided)
-"Fact-check these claims"                             → fact-check mode
-"Do a literature review on X"                         → lit-review mode
-"Compare these papers in WHY/HOW/WHAT format"         → three-way-scan mode
-"Review this paper's research quality"                → review mode
-```
+`sr-screener` has eight modes: `protocol`, `quick`, `pilot`, `ta-screen`,
+`ft-screen`, `adjudicate`, `audit`, and `report`. Screening starts only on an
+explicit request; `deep-research` `systematic-review` never hands off to it
+automatically. The review team confirms the eligibility rules and verifies AI
+decisions. Full title/abstract screening requires a pilot comparison with the
+team's labels that misses no record the team advanced, unless the user records
+an override. Counts remain provisional until a senior reviewer completes QC
+of a reproducible sample of jointly excluded records (minimum 20, default 100; all exclusions when fewer are available).
+Missing or malformed decisions remain pending. Synthetic tests exercise the
+scripts; screening accuracy has not been measured.
 
-#### Academic Paper (11 modes)
+### Claude-Style Aliases
 
-```
-"Write a paper on X"                                  → full mode
-"Guide me through writing a paper"                    → plan mode (guided)
-"Build a paper outline"                               → outline-only mode
-"I have a draft, here are reviewer comments"          → revision mode
-"Parse these reviewer comments into a roadmap"        → revision-coach mode
-"Write an abstract for this paper"                    → abstract-only mode
-"Turn this into a literature review paper"            → lit-review mode
-"Convert to LaTeX" / "Convert citations to IEEE"      → format-convert mode
-"Check citations"                                     → citation-check mode
-"Generate an AI disclosure statement for NeurIPS"     → disclosure mode
-"Audit my rebuttal draft against the reviews"         → rebuttal-audit mode
-```
+Claude Code v3.7 installs `/ars-*` slash commands. Codex does not have the same
+plugin command registry, so this package emulates the command intent inside the
+single `$academic-research-suite` skill. Use either form:
 
-#### Academic Paper Reviewer (6 modes)
-
-```
-"Review this paper"                                   → full mode (Journal-Fit Reviewer + R1/R2/R3 + Devil's Advocate)
-"Quick assessment of this paper"                      → quick mode
-"Guide me to improve this paper"                      → guided mode
-"Check the methodology"                               → methodology-focus mode
-"Verify the revisions"                                → re-review mode
-"Calibrate this reviewer against my gold set"         → calibration mode
+```text
+Use $academic-research-suite: ars-plan my paper on AI governance in universities.
 ```
 
-#### Academic Pipeline (Orchestrator)
+or, when your Codex client passes slash-prefixed text through as a normal user
+message:
 
-```
-"I want to write a complete research paper"           → full pipeline from Stage 1
-"I already have a paper, review it"                   → mid-entry at Stage 2.5 (integrity first)
-"I received reviewer comments"                        → mid-entry at Stage 4
-```
-
-> Pipeline ends with **Stage 6: Process Summary** — auto-generates a paper creation process record with 6-dimension Collaboration Quality Evaluation (1–100 scoring).
-
-### Supported Languages
-
-- **Traditional Chinese** (繁體中文) — default when user writes in Chinese
-- **English** — default when user writes in English
-- Bilingual abstracts (Chinese + English) for academic papers
-
-> **Using a different language?** Socratic mode (deep-research) and Plan mode (academic-paper) use **intent-based activation** — they detect the meaning of your request, not specific keywords. This means they work in **any language** without modification.
->
-> However, the general `Trigger Keywords` section (which determines whether the skill is activated at all) still lists English and Traditional Chinese keywords. If you find the skill isn't activating reliably in your language, you can add your language's keywords to the `### Trigger Keywords` section in each `SKILL.md` file to improve matching confidence.
-
-### Supported Citation Formats
-
-- APA 7.0 (default, including Chinese citation rules)
-- Chicago (Notes & Author-Date)
-- MLA
-- IEEE
-- Vancouver
-
-### Supported Paper Structures
-
-- IMRaD (empirical research)
-- Thematic Literature Review
-- Theoretical Analysis
-- Case Study
-- Policy Brief
-- Conference Paper
-
----
-
-## Skill Details
-
-Per-agent responsibilities and per-stage artifacts now live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Version numbers are anchored here so release metadata stays in one place.
-
-### Deep Research (v2.12.1)
-
-13-agent research team. Modes: full, quick, review, lit-review, three-way-scan, fact-check, socratic, systematic-review. Full agent roster and artifacts: see ARCHITECTURE.md §3.
-
-### Academic Paper (v3.3.1)
-
-12-agent paper writing pipeline. Modes: full, plan, outline-only, revision, revision-coach, abstract-only, lit-review, format-convert, citation-check, disclosure, rebuttal-audit. Output: MD + DOCX (via Pandoc when available) + LaTeX (APA 7.0 `apa7` class / IEEE / Chicago) → PDF via tectonic. Full agent roster and per-phase responsibilities: see ARCHITECTURE.md §3.
-
-### Academic Paper Reviewer (v1.11.1)
-
-7-agent multi-perspective review with **criterion-bound narrative judgements**. Modes: full, re-review, quick, methodology-focus, guided, calibration. Current live reviews and Schema 6 packages remain `NOT_CALIBRATED`; full calibration can produce a bounded candidate profile, but application to a live review is not wired. No numerical total is mapped to Accept, Minor Revision, Major Revision, or Reject. First-round review panel vs. contract-governed re-review dispatch boundary: see ARCHITECTURE.md §3 Stage 3 / Stage 3'.
-
-### Academic Pipeline (v3.22.1)
-
-10-stage orchestrator with integrity verification, two-stage review, Socratic coaching, and collaboration evaluation. Pipeline guarantees: every stage requires user confirmation checkpoint; integrity verification (Stage 2.5 + 4.5) is MANDATORY with no unrecorded bypass (every override requires user reasoning recorded for Stage 6); R&R Traceability Matrix (Schema 11) independently verifies author revision claims. v3.4 added the Compliance Agent (PRISMA-trAIce + RAISE) at Stage 2.5 / 4.5. v3.5 adds the **Collaboration Depth Observer** (`collaboration_depth_agent`, advisory only — never blocks) at every FULL/SLIM checkpoint and at pipeline completion. MANDATORY integrity gates (2.5 / 4.5) explicitly skip the observer so compliance checks are not diluted. Based on Wang & Zhang (2026), IJETHE 23:11. Stage-by-stage matrix with agents, artifacts, and gates: see ARCHITECTURE.md §3.
-
----
-
-## v3.0 Optimizations: What We Discovered About AI's Structural Limits
-
-### What happened
-
-While using ARS to write a reflection article about AI in higher education, I ran into three structural problems that no amount of prompt engineering could fix:
-
-1. **Frame-lock**: I asked the AI to run a devil's advocate debate against its own thesis. It did — four rounds, each more refined than the last. But every round stayed inside the frame I'd set. The DA attacked arguments, never premises. It never asked "are we even discussing the right question?" This is the same pattern that caused the 31% citation error rate in v2.7's stress test: the verifying AI and the generating AI share the same cognitive frame.
-
-2. **Sycophancy under pushback**: Every time I challenged the DA's attacks, it conceded too quickly. It retracted findings faster than it launched them. The model's training rewards conversational harmony — so "the user pushed back" was treated as evidence that the attack was wrong, when often it just meant the user was persistent.
-
-3. **Intent misdetection**: The Socratic Mentor kept trying to converge and produce deliverables ("Want me to write this up?") when I was still exploring. It couldn't distinguish "the user wants a deep philosophical discussion" from "the user wants an RQ brief." Both look like engagement, but they need opposite AI behaviors.
-
-### What we changed (v3.0)
-
-**Devil's Advocate — Concession Threshold Protocol** (`deep-research` + `academic-paper-reviewer`)
-- DA must now score every rebuttal on a 1-5 scale before responding
-- Concession only allowed at score ≥4 (rebuttal directly addresses core attack with evidence)
-- Score ≤3: hold position and restate the original attack
-- Anti-sycophancy rules: no consecutive concessions, concession rate tracking, frame-lock detection after each checkpoint
-
-**Socratic Mentor — Intent Detection Layer** (`deep-research`)
-- Classifies user intent as exploratory vs. goal-oriented at dialogue start and every 3 turns
-- Exploratory mode: disables auto-convergence, raises max rounds to 60, prohibits "want me to summarize?" prompts
-- Goal-oriented mode: standard convergence behavior
-- Anti-premature-closure rules: in exploratory mode, the user decides when to stop
-
-**Socratic Mentor — Dialogue Health Indicator** (`deep-research`)
-- Silent self-assessment every 5 turns on three dimensions: persistent agreement, conflict avoidance, premature convergence
-- Auto-injects challenging questions when agreement pattern detected
-- Invisible to user (to prevent gaming), but log available for post-session review
-
-### Why this matters
-
-These optimizations don't solve AI's structural limits — they make the limits visible and manageable. The DA will still eventually concede if pushed hard enough. The Socratic Mentor will still have some convergence bias. But now there are explicit checkpoints that slow down the sycophancy, force the DA to justify concessions, and prevent the Mentor from wrapping up before the user is ready.
-
-The deeper lesson: AI literacy isn't about learning to use AI as a tool, following ethics rules, or fearing AI risks. It's about engaging AI deeply enough to discover its structural limits yourself — and your own thinking limits in the process.
-
----
-
-## License
-
-This work is licensed under [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
-
-**You are free to:**
-- Share — copy and redistribute the material
-- Adapt — remix, transform, and build upon the material
-
-**Under the following terms:**
-- **Attribution** — You must give appropriate credit
-- **NonCommercial** — You may not use the material for commercial purposes
-
-**Attribution format:**
-```
-Based on Academic Research Skills by Cheng-I Wu
-https://github.com/Imbad0202/academic-research-skills
+```text
+/ars-plan my paper on AI governance in universities.
 ```
 
----
+If slash input is intercepted by the client, use the plain alias form:
 
-## Contributors
+```text
+ars-plan my paper on AI governance in universities.
+```
 
-**Cheng-I Wu** (吳政宜) — Author and maintainer
+| Claude command | Codex alias | Routed workflow |
+|---|---|---|
+| `/ars-plan` | `ars-plan` | `academic-paper` `plan` mode |
+| `/ars-outline` | `ars-outline` | `academic-paper` `outline-only` mode |
+| `/ars-abstract` | `ars-abstract` | `academic-paper` `abstract-only` mode |
+| `/ars-lit-review` | `ars-lit-review` | `academic-paper` `lit-review` mode |
+| `/ars-citation-check` | `ars-citation-check` | `academic-paper` `citation-check` mode |
+| `/ars-disclosure` | `ars-disclosure` | `academic-paper` `disclosure` mode |
+| `/ars-format-convert` | `ars-format-convert` | `academic-paper` `format-convert` mode |
+| `/ars-revision-coach` | `ars-revision-coach` | `academic-paper` `revision-coach` mode |
+| `/ars-revision` | `ars-revision` | `academic-paper` `revision` mode |
+| `/ars-reviewer` | `ars-reviewer` | `academic-paper-reviewer` full mode |
+| `/ars-mark-read` | `ars-mark-read` | Human-read signal for citation keys in the active Material Passport |
+| `/ars-unmark-read` | `ars-unmark-read` | Rescind a prior human-read signal |
+| `/ars-cache-invalidate` | `ars-cache-invalidate` | Invalidate cached verification entries for one citation key |
+| `/ars-full` | `ars-full` | `academic-pipeline` full workflow |
 
-**[aspi6246](https://github.com/aspi6246)** — Contributor. The v3.1 optimization was inspired by patterns from [Claude-Code-Skills-for-Academics](https://github.com/aspi6246/Claude-Code-Skills-for-Academics): read-only constraint pattern, anti-pattern codification as first-class design, cognitive framework approach (teaching "how to think" not just procedures), and lean skill size philosophy.
+### Working Pattern
 
-**[mchesbro1](https://github.com/mchesbro1)** — Contributor. Originally proposed and drafted the IS Basket of 8 journals for `academic-paper-reviewer/references/top_journals_by_field.md` ([Issue #5](https://github.com/Imbad0202/academic-research-skills/issues/5)).
+For best results, start with the workflow goal and the current state of your
+materials:
 
-**[cloudenochcsis](https://github.com/cloudenochcsis)** — Contributor. Extended the IS section from the *Basket of 8* to the full *Senior Scholars' Basket of 11* — adding *Decision Support Systems*, *Information & Management*, and *Information and Organization* ([Issue #7](https://github.com/Imbad0202/academic-research-skills/issues/7), [PR #8](https://github.com/Imbad0202/academic-research-skills/pull/8)). Sourced from the [AIS Senior Scholars' List of Premier Journals](https://aisnet.org/research/seniorscholarsbasket/).
+```text
+Use $academic-research-suite.
 
-**[eltociear](https://github.com/eltociear)** (Ikko Eltociear Ashimine) — Contributor. Translated the Japanese README ([`README.ja-JP.md`](README.ja-JP.md)) ([PR #161](https://github.com/Imbad0202/academic-research-skills/pull/161)).
+Goal: write a journal article.
+Current materials: I have a literature matrix and rough findings, but no outline.
+Output needed now: paper architecture and missing-evidence checklist.
+Constraints: English, APA 7, higher education policy audience.
+```
 
-**[xpfo-go](https://github.com/xpfo-go)** (xpfo) — Contributor. Translated the Simplified Chinese README ([`README.zh-CN.md`](README.zh-CN.md)) ([PR #181](https://github.com/Imbad0202/academic-research-skills/pull/181)).
+If you only have a paper topic or broad research direction and do not yet have a
+clear research question, the Codex router should start with ARS Socratic
+scoping:
 
-**[devCharlotte](https://github.com/devCharlotte)** — Contributor. Translated the Korean README ([`README.ko-KR.md`](README.ko-KR.md)) ([PR #469](https://github.com/Imbad0202/academic-research-skills/pull/469)).
+```text
+Use $academic-research-suite.
 
-**[Yaobin29](https://github.com/Yaobin29)** — Contributor. Proposed reviewer-response tooling in [PR #433](https://github.com/Imbad0202/academic-research-skills/pull/433); the `deep-research three-way-scan` mode and the `academic-paper rebuttal-audit` mode (rescued from the PR's `audit` concept) were integrated from that contribution in v3.12.1.
+I want to write a paper on AI adoption in higher education quality assurance.
+I do not yet have a clear research question.
+Please use SCR / Socratic dialogue to help me narrow the question first; do not write an outline yet.
+```
 
-**[ktao732084-arch](https://github.com/ktao732084-arch)** — Contributor. Expanded the `academic-paper` disclosure system with nine medical-publishing policy targets, target-specific required-fact intake, and fail-closed standalone rendering ([Issue #596](https://github.com/Imbad0202/academic-research-skills/issues/596), [PR #599](https://github.com/Imbad0202/academic-research-skills/pull/599)); expanded the EQUATOR clinical-reporting reference with condensed CARE, STARD and TRIPOD+AI guidance plus a fail-closed study-design routing sequence ([Issue #594](https://github.com/Imbad0202/academic-research-skills/issues/594), [PR #601](https://github.com/Imbad0202/academic-research-skills/pull/601)); and designed and contributed the standalone Chinese-literature resolver, API protocol, and synthetic transport-fixture suite ([Issue #595](https://github.com/Imbad0202/academic-research-skills/issues/595), [PR #600](https://github.com/Imbad0202/academic-research-skills/pull/600)).
+Expected route: `deep-research` `socratic` mode first. ARS should ask narrowing
+questions and should not produce an outline or draft until the research question
+has converged.
 
-**[didacrios](https://github.com/didacrios)** — Contributor. Translated the Spanish README ([`README.es-ES.md`](README.es-ES.md)).
+For review tasks, provide the manuscript or a path to the manuscript, plus the
+review mode you want:
 
----
+```text
+Use $academic-research-suite to review this paper.
+Mode: full review.
+Focus: methodology, contribution, citation integrity, and likely desk-reject risks.
+Output: reviewer reports plus editorial decision letter.
+```
 
-## Changelog
+For staged pipelines, ask for a checkpoint instead of asking Codex to run the
+entire process silently:
 
-Only the three most recent releases are summarized here. The full release history, including the one-paragraph summaries that used to live on this page, is in [CHANGELOG.md](CHANGELOG.md).
+```text
+Use $academic-research-suite to start an academic-pipeline run.
+Begin with Stage 0 intake and stop after producing the pipeline dashboard.
+```
 
-### v3.22.1 (2026-09-23) — Model currency for Claude Opus 5.5, citation-check loading and Chinese APA 7 repairs, and a Pi wrapper fix
+### Smoke Tests
 
-> **Model currency and repairs; the new prompt-level guard is unmeasured:** v3.22.1 names Claude Opus 5.5 beside Claude Fable 5.1 as a supported session model, after a two-reader audit of the Opus 5.5 system card that retires no guardrail (#883). The docs add effort guidance (Claude Code starts Opus 5.5 at `medium`; heavy runs should use `high` or above), one list-price re-derivation for both models, and tiering guidance that reads the ladder as the vendor's lineup order, not a capability order. Because the card reports that Opus 5.5 acts more often than earlier models on instructions inside pasted text, the revision coach now treats pasted reviewer and committee text as data, pinned by a lint; the effect of that prompt-level guard is unmeasured. The release also repairs mode loading and citation checks: the 13 plugin mode commands invoke their namespaced core skill and resolve bundled references from the plugin root, which restores citation-check loading (#857); Chinese APA 7 checks catch a missing in-text author abbreviation, keep ambiguity exceptions and complete reference-list author fields, and propose a reorder only with evidence of a stroke-order inversion (#882); citation checks now distinguish visible syntax errors from unverified resolution or source claims (#882); and new English, Traditional Chinese, and Korean trigger phrases route citation-check requests, with CI bounding each skill description at 1,024 code points (#858, #864). The Pi wrapper accepts string-array system prompts (#880). No schema, command model, or effort setting changes.
+In a new Codex conversation:
 
-### v3.22.0 (2026-09-16) — Output-language-pair contract, locale track, plugin eval suites, and Windows / transport repairs
+```text
+/skills
+```
 
-> **Additive structure, bounded evidence:** v3.22.0 lets a run declare its output language pair through a registry-keyed Schema 4 field whose absence reproduces the legacy files exactly (#862 Phase 1, PR #869), and stands up the locale track around it: an es-ES README and conservative trigger phrases contributed by @didacrios, and a community-maintained locale-pack policy with a provisional single-owner route. Two `claude plugin eval` suites (revision-coach, citation-check) and the reviewer-calibration harness ship as regression guards and dispatch substrates only; none claims a measured uplift or calibration value. Repairs: `/ars-mark-read` and the other five lock sites run on Windows through one shared helper with an `msvcrt` backend, the OpenAI request builders stop sending parameters GPT-6 Astra rejects, the contained Codex transport refuses `effort=ultra`, audit provenance records the actual judge identity, Socratic path F6 no longer preselects a direction, and an unsupported claim can no longer be rescued by hedging. READMEs keep three releases; Gartenberg et al. and Wang, Li et al. join the human-in-the-loop anchors. Roadmap Phase 4 (stage-level evidence ceilings) is not delivered in this release; its window carries forward.
+Expected: one ARS entry only.
 
-### v3.21.2 (2026-09-06) — Model currency for Claude Fable 5.1 and GPT-6 Astra, checkpoint decision provenance, and CJK title-matching repairs
+Then test Socratic routing:
 
-> **Currency and provenance, not new capability:** v3.21.2 aligns the suite to the two September 2026 vendor system cards. `gpt-6-astra` enters the cross-model table as provisional on both transports and becomes the recommended OpenAI verifier under the generation-currency policy; `gpt-5.6-sol` keeps its validated status on the ChatGPT-subscription citation transport, and no new bakeoff result is claimed. The contained Codex transport's reasoning-effort set gains `ultra`. Two guardrails are added, both prompt-level and vendor-motivated rather than ARS-measured: checkpoint decision provenance (only a user turn is a decision; decisions are re-transmitted to subagents verbatim; risk R11) and provider-side monitoring or safety interventions named as a transport failure that is never a verdict. A harness-retirement audit against both cards retires nothing (0 prompt-text retirements; 8 keep-as-debt items now carry a card citation). Fixes: CJK titles no longer fail the exact-title gate in the four index resolvers (#798) and wrapper marks are stripped only as one balanced unit (#800); the autolink round-trip test declares its dependency (#801); `check_surface_form_parity` names a broken environment instead of the manifest; a skill-inventory parity lint (#809); the R10 residual gap de-staled (#813); an MLA key-rules line corrected (#805). Suite/pipeline → v3.21.2; deep-research → v2.12.1; academic-paper → v3.3.1; academic-paper-reviewer → v1.11.1.
+```text
+Use $academic-research-suite.
+I want to write a paper on AI adoption in higher education quality assurance.
+I do not yet have a clear research question.
+```
+
+Expected: route to `deep-research` `socratic` mode and ask narrowing questions.
+
+CLI smoke test:
+
+```bash
+codex exec --ephemeral --sandbox read-only \
+  -C /path/to/academic-research-skills-codex \
+  'Use $academic-research-suite. Router smoke test only. User request to classify: I want to write a paper on AI adoption in higher education quality assurance, but I do not yet have a clear research question. According to the academic-research-suite router, classify the workflow and mode.'
+```
+
+Maintainer quality gates:
+
+```bash
+python3 skills/academic-research-suite/codex/scripts/ars_codex_quality_gates.py all --json
+```
+
+Expected: every reported gate has `"ok": true`.
+
+### Non-Blocking Codex Warnings
+
+These Codex messages do not mean ARS failed to install:
+
+- `[features].codex_hooks is deprecated` — update your Codex config when
+  convenient; ARS-Codex does not require hooks for normal use.
+- `hooks need review before they can run` — review those hooks separately if
+  you use them. ARS-Codex treats vendored Claude hooks as traceability metadata
+  and does not require them.
+
+### Codex Adapter Behavior
+
+ARS was originally written for Claude Code. In this Codex package:
+
+- The vendored `agents/*.md` files are used as role and phase prompts.
+- The Codex-only `codex/` directory contains an optional full-runtime adapter
+  profile. Its fixed topology and hook pack are opt-in; normal execution adapts
+  native subagents to the task.
+- The vendored `commands/ars-*.md` files are prompt recipes only. Codex does not
+  register them as slash commands.
+- The vendored `hooks/hooks.json` file is preserved for upstream traceability
+  only. Codex does not install Claude Code hooks from this package.
+- Codex may delegate bounded independent work through native subagents within
+  the current task and permissions, while the lead continues useful work.
+- Web/source verification uses Codex browsing and must cite sources when current
+  or external facts matter.
+- Cross-model verification is disabled by default. When explicitly requested in
+  this Codex package, follow the vendored provider setup in
+  `ars/shared/cross_model_verification.md`, identify the provider/model/content
+  class first, and obtain explicit user consent before any external upload.
+  External reviewers are called through configured provider APIs, not simulated
+  through the active Codex model.
+- `ARS_MODEL_TIERING` is unset by default. The Codex adapter preserves the
+  upstream judgment/execution classification but applies `economy` or
+  `quality-boost` only when the runtime supports an explicit per-dispatch model
+  override; otherwise it reports a no-op and keeps the active model.
+- Protected top-level agent `tools:` allowlists remain least-privilege role
+  boundaries. A dispatched checkpoint owner does not gain Bash or network
+  transport; the dispatching Codex context owns any explicitly consented
+  cross-model call.
+- A `[CROSS-MODEL-HANDOFF v1]` block is a transport request, not a deliverable.
+  The dispatcher validates it, sends only its payload, applies the mechanical
+  result routing, and returns judgment work to the original owner.
+- In reviewer `full` mode, an explicitly configured and consented cross-model
+  run swaps the existing Reviewer 2 seat; it never adds a sixth reviewer.
+  Re-review applies the separate Priority-1 judge pass and records provenance.
+  Single-family execution and provider fallback are disclosed.
+- `ARS_CACHE_STALE_ADVISORY_DAYS` controls the advisory-only cache-age threshold,
+  while `ARS_CACHE_REVALIDATE=1` opts into live bibliographic re-validation.
+  These settings apply when the programmatic citation gate is run; stale rows
+  alone never fail an integrity gate.
+- Locally read PDFs run the structural `pdf_read_preflight.py` by default before
+  page anchors are trusted. `FAIL` and `UNAVAILABLE` remain distinct, and a
+  missing parser or sidecar is never treated as `PASS`. The v3.20 sandboxed
+  content classifier is an explicit opt-in advisory and cannot override this
+  structural preflight.
+- `ars-mark-read` requires a user-declared `read_scope` for every new mark.
+  Explicit unknown and legacy scope-less records remain `coverage_unknown`;
+  partial coverage stays visible and Codex never infers full-text reading.
+- Revision rounds use the v3.20 evidence-bound, non-ranking roadmap and explicit
+  author-adjudication contract. They also preserve the v3.19-introduced
+  claim-strength ladder and deterministic numeric, citation, marker, and
+  protected-term conservation checks as advisory-first guards.
+- The upstream v3.18 SessionStart update checker is vendored but not installed
+  or executed as a Codex hook. Plugin users update with
+  `codex plugin marketplace upgrade ars-codex` followed by
+  `codex plugin add ars-codex@ars-codex`; direct skill installs still update by
+  reinstalling or pulling this repository.
+- Upstream references to a "fresh Claude Code session" mean a new Codex
+  conversation in this package; Material Passport reset semantics still apply.
+- If a citation, source, statistic, or journal policy cannot be verified, Codex
+  should mark it as unverified rather than invent support.
+
+### ARS v3.24.0 Parity
+
+This package adapts upstream ARS `v3.24.0` at
+`b34c63f828b3535f403079a4f42bc7955da2f64b` wherever Codex has an equivalent
+concept, with documented model/runtime overlays.
+
+Bibliographic network behavior is intentionally explicit at the Codex adapter
+boundary:
+
+| Research path | Default Codex behavior | Dedicated API/client trigger |
+|---|---|---|
+| Ordinary topic or candidate discovery | Codex browsing and authoritative web sources | The four Python resolver clients are not launched |
+| Prompt-level ingest, deduplication, or source verification | Codex browsing or official metadata pages | “Automatic” lookup wording in vendored prompts does not launch a Python client |
+| Script-backed citation-existence gate | Not implied by `ars-full`; Stage 2.5/4.5 still run as integrity checkpoints through the default Codex route | Explicit programmatic-verification request; then Crossref/OpenAlex/Semantic Scholar run for non-manual references and arXiv only when `arxiv_id` exists, subject to cache behavior |
+| Claim-standing discovery | Advisory offer after an eligible Stage 2.5/4.5 Claim Registry row | Separate user request plus affirmative plan-bound consent; uses v3.21 discovery adapters, not the single-reference resolver clients |
+| Contamination backfill or migration | Never automatic | Explicit migration CLI only |
+| Suggested-reference check in review letters | Not run; the attachment says the check did not run | Explicit request; then the four clients run live for the suggested titles and identifiers only |
+
+| Upstream ARS feature | Codex package behavior |
+|---|---|
+| One installable plugin | Native Codex plugin `ars-codex`, bundling the single `academic-research-suite` skill |
+| `/ars-*` slash commands | Emulated as `ars-*` aliases through the skill router; not native slash commands |
+| Five upstream skills auto-discovered from `skills/` symlinks | Single Codex router skill selects the workflow and reads the vendored workflow `WORKFLOW.md` files |
+| Plugin-shipped agents | Role/phase prompts run inline or as bounded native subagents according to task dependencies and runtime permissions |
+| Optional Codex full-runtime profile | Planner, agent-team templates, and hook pack live under `skills/academic-research-suite/codex/`; disabled by default |
+| Four commands (`ars-full`, `ars-reviewer`, `ars-revision-coach`, `ars-citation-check`) omit `model:`; light modes retain `model: sonnet` | These commands inherit the current Codex session model; light-mode `sonnet` remains upstream Claude metadata and does not override the session model |
+| `ARS_MODEL_TIERING=economy\|quality-boost` | Classification is preserved; routing remains advisory unless Codex exposes per-dispatch model selection |
+| Protected agent `tools:` allowlists | Preserved as least-privilege role boundaries; dispatched owners do not receive Bash/network transport |
+| Canonical cross-model handoff envelope | Dispatcher validates the envelope, transports only the payload after consent, and follows the closed result-routing contract |
+| Contained Codex citation transport | Opt-in, consent-gated transport is limited to narrow citation-integrity checks; it is inactive unless explicitly configured and requested |
+| Run ledger and handoff check | With a passport file, pipeline prompts direct the caller to keep a local ledger of exact user words, step receipts, and file hashes; deterministic reports check handoffs after compaction, resume, and subagent returns, without establishing new authorization |
+| Deterministic acronym check | The caller checks saved drafts and abstracts locally; partial coverage is explicit, and a review attachment remains advisory and outside decision, roadmap, and re-review criteria |
+| Review-letter attachments | The suggested-reference check runs only on explicit request; the reviewer claim check uses one isolated, tool-less worker and is never judged inline; neither feeds the decision, roadmap, or re-review criteria |
+| Instruction/data boundary and routing | Third-party text remains data across workflow intake, dispatches, and tool reads; explicit requests stay in their selected mode when inputs are missing, and Claude startup hooks remain inactive |
+| Chinese APA 7 citation checks | Preserve author-abbreviation exceptions and reference-list authors, require evidence before proposing a stroke-order change, and distinguish visible syntax errors from unverified source claims |
+| Evidence-bound review and revision | Durable evidence rows, confirmed review criteria, non-ranking roadmaps, author adjudication, and revision-evidence bundles are preserved |
+| Research-workflow profiles | Default-off deterministic selection with a visible field-general fallback; no research family is inferred from manuscript content, and corrections stale rather than rewrite prior artifacts |
+| Inquiry branch ledger | `ARS_INQUIRY_LEDGER=1` enables the local opt-in alpha; author events, bounded summaries, path/lock/recovery safeguards, and stale causes are preserved without granting network authority |
+| Sealed model-promotion bakeoffs | Commitment/reveal contracts and hermetic tests are vendored; the history-dependent tree verifier remains upstream-only because the re-rooted subtree has no complete upstream Git history |
+| Socratic research-question authorship | Non-convergence never triggers system-authored candidate questions; explicit user request is required to leave non-generation mode |
+| Categorical reviewer judgement and panel provenance | Live packages remain `NOT_CALIBRATED`; no numeric score, weight, aggregate, ranking, or binary independence claim is fabricated |
+| Review criteria and human-subjects authority | Venue/criteria and ethics/data-protection authority require explicit user confirmation; Codex does not infer or simulate approval |
+| Optional PDF content classifier | The sandboxed classifier is an opt-in advisory dependency and cannot override structural PDF preflight results |
+| Cross-model Reviewer 2 and re-review judge tracks | Available only with explicit provider configuration and content consent; the fixed seat, Judge Record, single-family disclosure, and fallback disclosure are preserved |
+| Source-backed review-criteria proving set | Exact-profile author confirmation, source receipts, and three-consumer digest binding are preserved; one proving profile is not venue or discipline coverage |
+| Cache staleness advisory and live re-validation | Local cache remains the default; stale rows are advisory-only and `ARS_CACHE_REVALIDATE=1` opts into live bibliographic checks |
+| Data-flow and capability transparency | The v3.21 network map, control-availability matrix, stage-capability matrix, risk register, and governance statement are vendored without promoting evidence labels into effectiveness or certification claims |
+| Claim-standing pipeline wiring | Eligibility only offers the advisory view; query-plan binding, explicit consent, freshness validation, and transmission accounting remain mandatory before any external call |
+| Risk-stratified claim, scope, and novelty checks | Vendored workflow prompts and schemas preserve high-impact-first sampling plus advisory-only scope and search-bounded novelty rows |
+| Local-PDF read-integrity preflight | The structural pypdf preflight and sidecar contract remain the default; parser unavailability or repair warnings stay explicit `UNAVAILABLE` advisories, while the v3.20 classifier above remains opt-in only |
+| Human-read scope attestation | Every new mark requires user-owned `read_scope`; legacy missing scope remains unknown and partial coverage stays distinguishable from full coverage |
+| Claim coverage and bounded evaluation substrates | Exact registered-claim coverage, drift dispositions, claim-standing stance tools, and blind ideation assignment preserve provenance and unmeasured boundaries without certifying semantic completeness or correctness |
+| Revision claim-drift guards | The v3.20 non-ranking roadmap and author-adjudication contract complement the claim-strength ladder, revision-evidence bundle, deterministic token-conservation checker, and held-out measurement set |
+| Executable panel/degradation/pipeline-boundary checks | Vendored with their hermetic tests and exposed by the optional full-runtime manifest |
+| SessionStart and SubagentStop hooks, including the update reminder | Vendored for traceability only; Codex does not install or execute Claude hooks |
+| Plugin marketplace update | Refresh with `codex plugin marketplace upgrade ars-codex`, then re-add `ars-codex@ars-codex`; direct skill installs still reinstall or pull |
+| Claude Code Agent Team | Native Codex subagents are scheduled adaptively; the separate fixed topology remains opt-in |
+| Cross-model provider dispatch from upstream docs | Disabled by default; available only with explicit provider configuration and explicit user consent |
+
+### Optional External Cross-Model Reviewer API
+
+For reviewer calibration or cross-model devil's advocate checks, configure one
+of the provider tuples documented in
+`ars/shared/cross_model_verification.md`, then ask for cross-model verification
+explicitly in the prompt. For example:
+
+```bash
+export OPENAI_API_KEY="<your-openai-api-key>"
+export ARS_CROSS_MODEL="gpt-6-astra"
+```
+
+`gpt-6-astra` remains provisional on both verifier transports. A GPT verifier
+used by a GPT session is a separate run in the same family, not cross-family
+validation. Provider/content/cost consent still applies.
+
+Without both a configured provider and explicit user consent for the content
+class being sent, ARS-Codex falls back to single-runtime review and reports that
+cross-model verification was unavailable.
+
+## Support And Sponsorship
+
+If ARS-Codex helps your research workflow, you can support maintenance through
+[Buy Me a Coffee](https://buymeacoffee.com/crucify020v).
+
+## Security
+
+Do not open public issues for vulnerabilities. Follow
+[`SECURITY.md`](SECURITY.md) for private reporting, and see the
+[release readiness and security report](security_best_practices_report.md) for
+the latest local validation summary.
+
+### File Layout For Advanced Use
+
+The entry point is:
+
+```text
+skills/academic-research-suite/SKILL.md
+```
+
+Workflow content is under:
+
+```text
+skills/academic-research-suite/ars/<workflow>/
+```
+
+Shared schemas, compliance rules, and cross-workflow contracts are under:
+
+```text
+skills/academic-research-suite/ars/shared/
+```
+
+When debugging or updating the package, preserve these paths. Many ARS workflow
+files cross-reference `shared/`, `scripts/`, `examples/`, and other workflow
+directories.
+
+## Update Policy
+
+Updates sync selected upstream ARS content into `skills/academic-research-suite/ars/`.
+Do not mirror the Claude Code repo blindly; exclude Claude/plugin loader files
+such as `.claude/`, `.claude-plugin/`, source `.gitignore`, and symlink-only
+alias directories that are not needed in Codex. Nested upstream `.github/`
+workflows may be retained as inactive traceability and self-test fixtures.
+
+### Inactive Upstream Scripts
+
+Some upstream maintenance scripts are vendored but intentionally inactive in
+this Codex package because they require non-vendored Claude Code inputs such as
+`.claude/CLAUDE.md`. See `inactive_upstream_scripts` in
+`skills/academic-research-suite/manifest.json` before wiring any upstream script
+into Codex CI.
+
+## Contributors And Acknowledgements
+
+**Cheng-I Wu** - Maintainer of the ARS suite and this Codex sibling
+distribution.
+
+**Codex** - Assisted with the Codex adapter packaging, router-policy hardening,
+test fixes, and release-readiness review under maintainer direction.
+
+**[vinschger](https://github.com/vinschger)** - Reported beginner installation
+friction around `python` vs `python3`, which led to clearer setup instructions
+for macOS and other environments.
+
+**[Joker2377](https://github.com/Joker2377)** - Helped answer community
+installation questions and clarify beginner setup steps in issue discussions.
+
+Vendored upstream ARS contributors are acknowledged in
+[`skills/academic-research-suite/ars/README.md`](skills/academic-research-suite/ars/README.md#contributors).

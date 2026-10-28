@@ -1,8 +1,8 @@
 {
   "$schema": "https://catalog.msh.team/misc/kimi.plugin.schema.json",
   "name": "academic-research-skills",
-  "version": "3.22.1+sync.20260923",
-  "description": "Contract-audited academic research pipeline for Claude Code: research → write → review → revise → finalize. 4 skills, 27 modes, 39 prompt roles (3 plugin-exposed agents; the rest run inline by default), v3.7.3 + v3.8 L3 claim-faithfulness gate, v3.9.0 cross-index triangulation, v3.10 triangulation policy layer, v3.11 deterministic citation verification gate (#182). Capability ceilings: docs/STAGE_CAPABILITY_MATRIX.md.",
+  "version": "3.24.0+kimi.20261028",
+  "description": "Academic research, writing, review, screening, and experiment workflows for Kimi Code, with one router and six direct Skill entrypoints.",
   "keywords": [
     "academic",
     "research",
@@ -16,27 +16,14 @@
   ],
   "author": "Cheng-I Wu",
   "license": "CC-BY-NC-4.0",
-  "homepage": "https://github.com/Imbad0202/academic-research-skills",
+  "homepage": "https://github.com/jerryemc/academic-research-skills-kimi",
   "interface": {
-    "displayName": "academic-research-skills",
-    "shortDescription": "Contract-audited academic research pipeline for Claude Code: research → write → review → revise → finalize. 4 skills, 27",
-    "longDescription": "Contract-audited academic research pipeline for Claude Code: research → write → review → revise → finalize. 4 skills, 27 modes, 39 prompt roles (3 plugin-exposed agents; the rest run inline by default), v3.7.3 + v3.8 L3 claim-faithfulness gate, v3.9.0 cross-index triangulation, v3.10 triangulation policy layer, v3.11 deterministic citation verification gate (#182). Capability ceilings: docs/STAGE_CAPABILITY_MATRIX.md.",
-    "developerName": "Cheng-I Wu",
+    "displayName": "Academic Research Skills for Kimi",
+    "shortDescription": "Academic research and writing workflows with seven Kimi Skill entrypoints.",
+    "longDescription": "A Kimi Code adaptation of ARS-Codex. Use the academic-research-suite router or invoke deep-research, academic-paper, academic-paper-reviewer, academic-pipeline, sr-screener, and experiment-agent directly.",
+    "developerName": "Cheng-I Wu; Kimi adaptation by jerryemc",
     "category": "PRODUCTIVITY",
-    "websiteURL": "https://github.com/Imbad0202/academic-research-skills"
+    "websiteURL": "https://github.com/jerryemc/academic-research-skills-kimi"
   },
-  "skills": "./skills/",
-  "hooks": [
-    {
-      "event": "SessionStart",
-      "command": "bash \"${KIMI_PLUGIN_ROOT}/scripts/announce-ars-loaded.sh\""
-    },
-    {
-      "event": "PreToolUse",
-      "command": "bash \"${KIMI_PLUGIN_ROOT}/hooks/run_guard.sh\"",
-      "matcher": "Write|Edit|MultiEdit|Bash"
-    }
-  ],
-  "commands": "./commands/",
-  "agents": "./agents/"
+  "skills": "./skills/"
 }
