@@ -1,0 +1,10 @@
+{
+  "workflows": [
+    "deep-research",
+    "academic-paper",
+    "academic-paper-reviewer",
+    "academic-pipeline",
+    "sr-screener",
+    "experiment-agent"
+  ]
+}
