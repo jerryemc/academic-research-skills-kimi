@@ -61,6 +61,8 @@ def sync_upstream(repo_root: Path, upstream_repo: Path) -> dict:
     staging = Path(tempfile.mkdtemp(prefix=".ars-codex-sync-", dir=repo_root))
     try:
         shutil.copytree(source_ars, staging / "ars")
+        if (repo_root / "skills").is_dir():
+            shutil.copytree(repo_root / "skills", staging / "skills")
         shutil.copy2(upstream_repo / "README.md", staging / "README.upstream.md")
         target_manifest = json.loads((repo_root / "kimi.plugin.json").read_text(encoding="utf-8"))
         date_suffix = datetime.now(timezone.utc).strftime("%Y%m%d")

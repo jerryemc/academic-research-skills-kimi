@@ -2,13 +2,12 @@ name: sync-upstream
 
 on:
   schedule:
-    # 每周一 07:23 UTC
     - cron: "23 7 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: write
-  issues: write
+  pull-requests: write
 
 concurrency:
   group: sync-upstream
@@ -19,86 +18,100 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Clone upstream
-        run: |
-          git clone https://github.com/Imbad0202/academic-research-skills.git /tmp/upstream
-          echo "NEW_SHA=$(git -C /tmp/upstream rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
-      - name: "Security gate: did upstream touch hooks/ or scripts/?"
-        id: gate
+      - name: Install test dependencies
+        run: python -m pip install pytest pyyaml
+
+      - name: Clone ARS-Codex upstream
         run: |
+          git clone --depth 1 https://github.com/Imbad0202/academic-research-skills-codex.git /tmp/ars-codex
+          NEW_SHA=$(git -C /tmp/ars-codex rev-parse HEAD)
           OLD_SHA=$(cat .upstream-commit 2>/dev/null || true)
+          echo "new_sha=$NEW_SHA" >> "$GITHUB_OUTPUT"
           echo "old_sha=$OLD_SHA" >> "$GITHUB_OUTPUT"
-          if [ -n "$OLD_SHA" ] && [ "$OLD_SHA" != "$NEW_SHA" ]; then
-            if ! git -C /tmp/upstream diff --quiet "$OLD_SHA" "$NEW_SHA" -- hooks scripts; then
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-            fi
+          if [ "$NEW_SHA" = "$OLD_SHA" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+        id: source
 
-      - name: Open review issue (upstream hooks/scripts changed)
-        if: steps.gate.outputs.changed == 'true'
+      - name: Skip unchanged upstream
+        if: steps.source.outputs.changed == 'false'
+        run: echo "Already at $OLD_SHA; no sync branch or PR is needed."
+
+      - name: Synchronize content and generate Skill entries
+        if: steps.source.outputs.changed == 'true'
+        run: |
+          python tools/kimi-sync/sync_ars_codex.py \
+            --upstream /tmp/ars-codex \
+            --repo-root . | tee /tmp/ars-sync-report.json
+
+      - name: Run sync and plugin checks
+        if: steps.source.outputs.changed == 'true'
+        run: |
+          python -m pytest tools/kimi-sync/tests -v
+          python tools/kimi-sync/validate_plugin.py .
+
+      - name: Commit sync branch
+        if: steps.source.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OLD_SHA: ${{ steps.gate.outputs.old_sha }}
-        run: |
-          if [ "$(gh issue list --state open --search 'in:title 上游 hooks' --json number --jq 'length')" != "0" ]; then
-            echo "A review issue is already open; not creating a duplicate."
-            exit 0
-          fi
-          gh issue create \
-            --title "上游 hooks/ 或 scripts/ 有改动，需人工审阅后手动同步" \
-            --body "上游从 \`$OLD_SHA\` 更新到 \`$NEW_SHA\` 时改动了 \`hooks/\` 或 \`scripts/\`，自动同步已暂停。\n\n改动对比：https://github.com/Imbad0202/academic-research-skills/compare/$OLD_SHA...$NEW_SHA\n\n请人工审阅这些脚本（它们会以 bash 形式在会话事件中自动执行），确认无误后到 Actions 页面手动 Run workflow 完成同步。"
-
-      - name: Stop when review is required
-        if: steps.gate.outputs.changed == 'true'
-        run: |
-          echo "Upstream hooks/scripts changed; auto-sync paused. See the created issue."
-          exit 0
-
-      - name: Convert upstream to Kimi plugin format
-        run: |
-          python3 tools/kimi-sync/convert_plugin_repo.py /tmp/upstream --output-dir /tmp/converted --force
-          MANIFEST=$(find /tmp/converted -name kimi.plugin.json | head -n 1)
-          [ -n "$MANIFEST" ] || { echo "转换产物中找不到 kimi.plugin.json"; exit 1; }
-          PLUGIN_DIR=$(dirname "$MANIFEST")
-          echo "PLUGIN_DIR=$PLUGIN_DIR" >> "$GITHUB_ENV"
-
-      - name: Overwrite repo root with converted product (keep our own files)
-        run: |
-          rsync -a --delete \
-            --exclude /.git/ \
-            --exclude /README.md \
-            --exclude /README.upstream.md \
-            --exclude /LICENSE \
-            --exclude /.upstream-commit \
-            --exclude /tools/ \
-            --exclude /.github/ \
-            "$PLUGIN_DIR/" ./
-          test -f kimi.plugin.json || { echo "rsync 后仓库根缺少 kimi.plugin.json"; exit 1; }
-
-      - name: Adapt hook placeholders to Kimi runtime
-        run: |
-          # 转换器产物沿用了 ${CLAUDE_PLUGIN_ROOT}，Kimi Code 注入的是 KIMI_PLUGIN_ROOT
-          sed -i 's/\${CLAUDE_PLUGIN_ROOT}/${KIMI_PLUGIN_ROOT}/g' kimi.plugin.json
-
-      - name: Bump version to <upstream>+sync.YYYYMMDD
-        run: |
-          BASE=$(jq -r '.version | split("+")[0]' kimi.plugin.json)
-          jq --arg v "${BASE}+sync.$(date -u +%Y%m%d)" '.version = $v' kimi.plugin.json > kimi.plugin.json.tmp
-          mv kimi.plugin.json.tmp kimi.plugin.json
-
-      - name: Record upstream SHA
-        run: echo "$NEW_SHA" > .upstream-commit
-
-      - name: Commit and push if changed
+          NEW_SHA: ${{ steps.source.outputs.new_sha }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="sync/ars-codex-${NEW_SHA::7}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          git checkout -B "$BRANCH"
           git add -A
           if git diff --cached --quiet; then
-            echo "No changes since last sync; nothing to push."
+            echo "Upstream metadata changed but produced no file diff; nothing to publish."
+            exit 0
+          fi
+          git commit -m "Sync ARS-Codex @ $NEW_SHA"
+          git push --force-with-lease origin "$BRANCH"
+        id: publish
+
+      - name: Create or update review PR
+        if: steps.source.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_SHA: ${{ steps.source.outputs.new_sha }}
+          OLD_SHA: ${{ steps.source.outputs.old_sha }}
+          BRANCH: ${{ steps.publish.outputs.branch }}
+        run: |
+          SOURCE_VERSION=$(jq -r '.source_version' /tmp/ars-sync-report.json)
+          ADDED=$(jq -c '.added_workflows' /tmp/ars-sync-report.json)
+          REMOVED=$(jq -c '.removed_workflows' /tmp/ars-sync-report.json)
+          {
+            echo "Sync ARS-Codex from \`$OLD_SHA\` to \`$NEW_SHA\`."
+            echo
+            echo "- Upstream version: \`$SOURCE_VERSION\`"
+            echo "- Added workflows (report only): \`$ADDED\`"
+            echo "- Removed workflows: \`$REMOVED\`"
+            echo "- \`python -m pytest tools/kimi-sync/tests -v\`: passed"
+            echo "- \`python tools/kimi-sync/validate_plugin.py .\`: passed"
+            echo
+            if [ "$ADDED" != "[]" ]; then
+              echo "**Review required:** new upstream workflows were not registered. Update \`tools/kimi-sync/ars_workflows.json\` deliberately before exposing them."
+              echo
+            fi
+            echo "Hooks, commands, and agents remain unregistered. Do not auto-merge; verify Kimi Code Desktop before publishing."
+          } > /tmp/ars-sync-pr.md
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            gh pr edit "$BRANCH" \
+              --title "Sync ARS-Codex @ ${NEW_SHA::7}" \
+              --body-file /tmp/ars-sync-pr.md
           else
-            git commit -m "Sync upstream academic-research-skills @ $NEW_SHA"
-            git push
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "Sync ARS-Codex @ ${NEW_SHA::7}" \
+              --body-file /tmp/ars-sync-pr.md
           fi

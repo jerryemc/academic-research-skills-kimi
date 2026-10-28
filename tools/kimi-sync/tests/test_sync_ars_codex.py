@@ -140,3 +140,12 @@ def test_missing_required_workflow_leaves_target_untouched(repo: Path, upstream:
     assert tree_bytes(repo / "skills") == before["skills"]
     assert (repo / "kimi.plugin.json").read_bytes() == before_manifest
     assert (repo / ".upstream-commit").read_bytes() == before_sha
+
+
+def test_repeat_sync_reports_existing_entries_as_unchanged(repo: Path, upstream: Path):
+    syncer.sync_upstream(repo, upstream)
+
+    report = syncer.sync_upstream(repo, upstream)
+
+    assert report["entry_report"]["generated"] == []
+    assert sorted(report["entry_report"]["unchanged"]) == sorted(WORKFLOWS + ["academic-research-suite"])
