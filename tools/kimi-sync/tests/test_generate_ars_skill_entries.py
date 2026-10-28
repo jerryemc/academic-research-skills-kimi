@@ -124,3 +124,36 @@ def test_missing_required_workflow_preserves_existing_entries(repo: Path):
         for path in (repo / "skills").glob("*/SKILL.md")
     }
     assert after == before
+
+
+def test_failed_new_directory_rename_restores_existing_entries(repo: Path, monkeypatch):
+    generator.generate_entries(repo, config_for(repo))
+    before = {
+        path.relative_to(repo): path.read_bytes()
+        for path in (repo / "skills").glob("*/SKILL.md")
+    }
+    source = repo / "ars" / "academic-paper" / "WORKFLOW.md"
+    source.write_text(
+        source.read_text(encoding="utf-8").replace(
+            "Instructions for academic-paper.",
+            "Changed instructions for academic-paper.",
+        ),
+        encoding="utf-8",
+    )
+    original_rename = Path.rename
+
+    def fail_generated_rename(self, target):
+        if self.name == "skills" and self.parent.name.startswith(".ars-skills-"):
+            raise OSError("injected generated skills rename failure")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", fail_generated_rename)
+
+    with pytest.raises(OSError, match="injected generated skills rename failure"):
+        generator.generate_entries(repo, config_for(repo))
+
+    after = {
+        path.relative_to(repo): path.read_bytes()
+        for path in (repo / "skills").glob("*/SKILL.md")
+    }
+    assert after == before

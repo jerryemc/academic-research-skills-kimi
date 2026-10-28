@@ -85,7 +85,12 @@ def _write_and_swap(repo_root, entries):
         if skills.exists():
             backup = temp_root / "previous-skills"
             skills.rename(backup)
-        generated.rename(skills)
+        try:
+            generated.rename(skills)
+        except Exception:
+            if backup is not None and not skills.exists():
+                backup.rename(skills)
+            raise
         if backup is not None:
             shutil.rmtree(backup)
     finally:

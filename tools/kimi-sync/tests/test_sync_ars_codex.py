@@ -149,3 +149,61 @@ def test_repeat_sync_reports_existing_entries_as_unchanged(repo: Path, upstream:
 
     assert report["entry_report"]["generated"] == []
     assert sorted(report["entry_report"]["unchanged"]) == sorted(WORKFLOWS + ["academic-research-suite"])
+
+
+def target_state(repo: Path) -> dict:
+    return {
+        "ars": tree_bytes(repo / "ars"),
+        "skills": tree_bytes(repo / "skills"),
+        "manifest": (repo / "kimi.plugin.json").read_bytes(),
+        "sha": (repo / ".upstream-commit").read_bytes(),
+        "readme": (repo / "README.upstream.md").read_bytes(),
+    }
+
+
+def change_upstream_body(upstream: Path):
+    workflow = upstream / SOURCE_SKILL / "ars" / "academic-paper" / "WORKFLOW.md"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8") + "\nNew upstream body.\n",
+        encoding="utf-8",
+    )
+    commit_upstream(upstream)
+
+
+def test_second_directory_replace_failure_rolls_back_everything(repo: Path, upstream: Path, monkeypatch):
+    syncer.sync_upstream(repo, upstream)
+    before = target_state(repo)
+    change_upstream_body(upstream)
+    original_replace = syncer._replace_directory
+
+    def fail_skills_replace(root, staging, name):
+        if name == "skills":
+            (root / "skills").rename(staging / "previous-skills")
+            raise OSError("injected skills replacement failure")
+        return original_replace(root, staging, name)
+
+    monkeypatch.setattr(syncer, "_replace_directory", fail_skills_replace)
+
+    with pytest.raises(OSError, match="injected skills replacement failure"):
+        syncer.sync_upstream(repo, upstream)
+
+    assert target_state(repo) == before
+
+
+def test_metadata_copy_failure_rolls_back_everything(repo: Path, upstream: Path, monkeypatch):
+    syncer.sync_upstream(repo, upstream)
+    before = target_state(repo)
+    change_upstream_body(upstream)
+    original_copy2 = syncer.shutil.copy2
+
+    def fail_commit_copy(source, destination, *args, **kwargs):
+        if Path(destination) == repo / ".upstream-commit":
+            raise OSError("injected metadata copy failure")
+        return original_copy2(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(syncer.shutil, "copy2", fail_commit_copy)
+
+    with pytest.raises(OSError, match="injected metadata copy failure"):
+        syncer.sync_upstream(repo, upstream)
+
+    assert target_state(repo) == before

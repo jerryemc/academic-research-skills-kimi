@@ -35,6 +35,25 @@ def _replace_directory(repo_root, staging, name):
     source.rename(target)
 
 
+def _rollback(repo_root, staging, original_directories, original_metadata):
+    for name in ("skills", "ars"):
+        target = repo_root / name
+        backup = staging / f"previous-{name}"
+        if backup.exists():
+            if target.exists():
+                shutil.rmtree(target)
+            backup.rename(target)
+        elif not original_directories[name] and target.exists():
+            shutil.rmtree(target)
+    for name, existed in original_metadata.items():
+        target = repo_root / name
+        backup = staging / f"previous-{name}"
+        if existed and backup.is_file():
+            shutil.copy2(backup, target)
+        elif not existed and target.exists():
+            target.unlink()
+
+
 def sync_upstream(repo_root: Path, upstream_repo: Path) -> dict:
     repo_root = Path(repo_root)
     upstream_repo = Path(upstream_repo)
@@ -74,10 +93,19 @@ def sync_upstream(repo_root: Path, upstream_repo: Path) -> dict:
         (staging / ".upstream-commit").write_text(source_sha + "\n", encoding="utf-8")
         entry_report = generate_entries(staging, DEFAULT_CONFIG)
 
-        _replace_directory(repo_root, staging, "ars")
-        _replace_directory(repo_root, staging, "skills")
-        for name in ("README.upstream.md", "kimi.plugin.json", ".upstream-commit"):
-            shutil.copy2(staging / name, repo_root / name)
+        metadata = ("README.upstream.md", "kimi.plugin.json", ".upstream-commit")
+        original_directories = {name: (repo_root / name).exists() for name in ("ars", "skills")}
+        original_metadata = {name: (repo_root / name).exists() for name in metadata}
+        try:
+            _replace_directory(repo_root, staging, "ars")
+            _replace_directory(repo_root, staging, "skills")
+            for name in metadata:
+                if original_metadata[name]:
+                    shutil.copy2(repo_root / name, staging / f"previous-{name}")
+                shutil.copy2(staging / name, repo_root / name)
+        except Exception:
+            _rollback(repo_root, staging, original_directories, original_metadata)
+            raise
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
