@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "Academic Research Skills for Kimi",
     "shortDescription": "Academic research and writing workflows with seven Kimi Skill entrypoints.",
-    "longDescription": "A Kimi Code adaptation of ARS-Codex. Use the academic-research-suite router or invoke deep-research, academic-paper, academic-paper-reviewer, academic-pipeline, sr-screener, and experiment-agent directly.",
+    "longDescription": "A Kimi Code adaptation of ARS-Codex. Use the academic-research-suite router or invoke deep-research, academic-paper, academic-paper-reviewer, academic-pipeline, sr-screener, and experiment-agent directly. GitHub: https://github.com/jerryemc/academic-research-skills-kimi",
     "developerName": "Cheng-I Wu; Kimi adaptation by jerryemc",
     "category": "PRODUCTIVITY",
     "websiteURL": "https://github.com/jerryemc/academic-research-skills-kimi"
