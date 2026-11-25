@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-"""rights_scan.py — 外部插件源目录的权利限制扫描（转换/登记前置）。
+"""rights_scan.py — Rights-restriction scan for external plugin source directories (pre-conversion/registration).
 
-扫描两类信号（移植自 agent-plugin-manager 分发版 kimi_install.py 的同名逻辑）：
-- 权利限制短语（severity: high）：仅在许可语境触发——LICENSE*/COPYING*/NOTICE* 文件、
-  manifest 的 license 字段、SKILL.md frontmatter 的 license 字段、方言 manifest 的
-  license 值（extra_license 传入）。命中专有许可、All Rights Reserved、Confidential、
-  EULA、禁止再分发、限定平台使用、非商业/试用、内部使用、商业秘密等短语。
-  含已知开源许可标记（MIT/Apache/GPL/BSD/ISC/MPL 等）的 LICENSE 文件跳过短语扫描，
-  避免 BSD 自带 "All rights reserved." 误报；README 正文命中只降级为警告（warnings）。
-- 厂商/平台信号（severity: notice）：manifest 的 author/publisher 含知名厂商名或官方
-  org 前缀、仓库/主页/git remote URL 指向厂商官方 org、来源路径含
-  marketplace/official/bundled 等成分。代码签名证书组织字段是可空跑的检查点
-  （本地目录形态不携带签名材料，固定返回 None）。
+Scans two signal categories (ported from agent-plugin-manager's kimi_install.py):
+- Rights-restriction phrases (severity: high): triggered only in license contexts —
+  LICENSE*/COPYING*/NOTICE* files, manifest license fields, SKILL.md frontmatter license
+  fields, and dialect manifest license values (passed via extra_license). Matches phrases
+  indicating proprietary licenses, All Rights Reserved, Confidential, EULA, no redistribution,
+  platform-restricted use, non-commercial/trial, internal use, or trade secrets.
+  LICENSE files containing known open-source license markers (MIT/Apache/GPL/BSD/ISC/MPL, etc.)
+  skip phrase scanning to avoid false positives on BSD's "All rights reserved."; README body
+  hits are downgraded to warnings.
+- Vendor/platform signals (severity: notice): manifest author/publisher matching known vendor
+  names or official org prefixes, repository/homepage/git remote URLs pointing to official vendor
+  orgs, or source path segments such as marketplace/official/bundled. Code-signing certificate
+  organization is a no-op hook (local directories carry no signing material and return None).
 
-命中不阻断转换：convert 把命中写进 conversion-report.json 并把插件分流进
-registration_plan 的 hold_rights_review 暂缓桶，用户审阅 plugin-builder-report.md
-后用 register_converted.py --only 放行；单个登记（register_personal）由本模块的
-CLI 形态把守，命中需 --confirm-rights 显式确认（exit 7 中止）。
+Hits do not block conversion: convert records them in conversion-report.json and routes the
+plugin into registration_plan's hold_rights_review bucket so users can review
+plugin-builder-report.md and approve via `register_converted.py --only`. Single-plugin
+registration (register_personal) is gated by this module's CLI, requiring --confirm-rights
+on hits (otherwise exits with code 7).
 
-CLI：python3 rights_scan.py <目录> [--confirm-rights]
-  输出结构化 JSON；命中且未确认时 exit 7，全干净或已确认 exit 0。
-  扫描为启发式风险提示，不能替代人工甄别。
+CLI: python3 rights_scan.py <dir> [--confirm-rights]
+  Outputs structured JSON; exits 7 if hits are unconfirmed, 0 if clean or confirmed.
+  Scanning is heuristic and does not replace manual review.
 """
 import argparse
 import json
@@ -32,17 +35,25 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plugin_common as pc
 
-RIGHTS_MAX_READ = 256 * 1024  # 单文件有界读取上限
+RIGHTS_MAX_READ = 256 * 1024  # Bounded per-file read limit
 
-# 法务提示文案（stderr 用纯文本）
-INSTALL_SAFETY_NOTICE = ("安全提示：插件可能来自第三方，请在安装前确认插件来源可信，以免造成账号、数据损失等。"
-                         "Kimi Work对插件的扫描不能覆盖全部风险，请您注意甄别。")
-RIGHTS_CONFIRM_NOTICE = "检测到该插件可能带有权利限制或平台专属条款。继续安装前，请确认您有权安装和使用该插件。"
-RIGHTS_RISK_NOTICE = ("权利风险提示：检测到该插件的许可文件包含权利限制条款（{categories}），"
-                      "可能禁止再分发或限定使用平台。继续安装前，请确认您有权安装和使用该插件；"
-                      "继续安装即视为您已自行确认并承担相应责任。")
+# Legal notice text (plain text on stderr)
+INSTALL_SAFETY_NOTICE = (
+    "Security notice: this plugin may come from a third party. Verify that the source is trusted "
+    "before installing to avoid account or data loss. Kimi Work's plugin scan cannot cover all risks; "
+    "please review carefully."
+)
+RIGHTS_CONFIRM_NOTICE = (
+    "This plugin may contain rights restrictions or platform-exclusive terms. "
+    "Before continuing, confirm that you have the right to install and use this plugin."
+)
+RIGHTS_RISK_NOTICE = (
+    "Rights risk notice: this plugin's license files contain restrictive terms ({categories}) "
+    "that may prohibit redistribution or restrict platform use. Before continuing, confirm that "
+    "you have the right to install and use this plugin; continuing means you accept responsibility."
+)
 
-# 权利限制短语：匹配为 case-insensitive + 字母数字边界（防嵌入更长单词的误报）
+# Rights-restriction phrases: matched case-insensitively with alphanumeric boundaries to avoid embedded-word hits
 RIGHTS_RESTRICT_PHRASES = (
     ("proprietary", "proprietary-license"),
     ("all rights reserved", "all-rights-reserved"),
@@ -61,14 +72,14 @@ RIGHTS_RESTRICT_PHRASES = (
     ("internal use only", "internal-use-only"),
     ("trade secret", "trade-secret"),
 )
-# 已知开源许可标记：LICENSE 文件含有这些标记时跳过权利限制短语扫描
+# Known OSS markers: LICENSE files containing any of these skip restriction phrase scanning
 KNOWN_OSS_MARKERS = (
     "mit license", "apache license", "gnu general public license",
     "gnu lesser general public license", "mozilla public license", "isc license",
     "bsd license", "permission is hereby granted",
     "redistribution and use in source and binary forms",
 )
-# 厂商元数据信号
+# Vendor metadata signals
 VENDOR_NAMES = ("anthropic", "openai", "google", "microsoft", "apple", "meta")
 VENDOR_ORG_PREFIXES = ("@anthropic-ai", "@anthropic", "@openai", "@google", "@googleapis",
                        "@microsoft", "@apple", "@meta", "@facebook", "@facebookincubator")
@@ -80,7 +91,7 @@ VENDOR_PATH_COMPONENTS = {"marketplace", "marketplaces", "official", "bundled"} 
 
 
 def _phrase_re(phrase):
-    """case-insensitive 子串匹配，两侧要求非字母数字边界（防误报）。"""
+    """Case-insensitive substring match requiring non-alphanumeric boundaries on both sides."""
     return re.compile(r"(?<![A-Za-z0-9])" + re.escape(phrase) + r"(?![A-Za-z0-9])", re.I)
 
 
@@ -89,7 +100,7 @@ VENDOR_NAME_RES = [(name, _phrase_re(name)) for name in VENDOR_NAMES]
 
 
 def _read_bounded(f, limit=RIGHTS_MAX_READ):
-    """有界读取文本（≤256KB），失败/超限返回 None，语义上由调用方跳过。"""
+    """Read up to limit bytes (default 256 KB) as UTF-8; return None on OSError so callers skip."""
     try:
         with open(f, "rb") as fh:
             return fh.read(limit).decode("utf-8", errors="replace")
@@ -105,7 +116,7 @@ def _collect_phrase_hits(text, rel, context, out):
 
 
 def _manifest_dicts(src):
-    """读取顶层 manifest（package.json / plugin.json / kimi.plugin.json），有界 + 坏 JSON 跳过。"""
+    """Read top-level manifests (package.json / plugin.json / kimi.plugin.json), bounded and skipping bad JSON."""
     for name in ("package.json", "plugin.json", "kimi.plugin.json"):
         text = _read_bounded(os.path.join(src, name))
         if not text:
@@ -119,7 +130,7 @@ def _manifest_dicts(src):
 
 
 def _skill_frontmatter_license(src):
-    """顶层 SKILL.md 与 skills/*/SKILL.md 的 frontmatter license 字段值。"""
+    """Yield (relpath, license_value) from frontmatter in root SKILL.md and skills/*/SKILL.md."""
     files = [os.path.join(src, "SKILL.md")]
     skills_dir = os.path.join(src, "skills")
     if os.path.isdir(skills_dir):
@@ -142,7 +153,7 @@ def _skill_frontmatter_license(src):
 
 
 def _vendor_in_text(text):
-    """厂商名（边界匹配）或官方 org 前缀（子串）。返回命中的值或 None。"""
+    """Match vendor name (boundary) or official org prefix (substring). Return matched value or None."""
     low = text.lower()
     for name, rx in VENDOR_NAME_RES:
         if rx.search(text):
@@ -162,24 +173,24 @@ def _vendor_in_url(url):
 
 
 def signing_org_signal(src):
-    """代码签名证书主体组织（O=...）检查点。本地目录形态一般不携带签名材料，
-    本模块无对应解析器，固定返回 None（可空跑的检查点，留待后续平台接入）。"""
+    """Code-signing certificate subject organization (O=...) hook. Local directories
+    do not carry signing material; returns None (no-op placeholder for future platforms)."""
     return None
 
 
 def scan_rights(src, extra_license=None):
-    """扫描源目录的权利限制信号。返回 {"restricted": [...], "warnings": [...], "vendor": [...]}。
+    """Scan a source directory for rights-restriction signals.
+    Returns {"restricted": [...], "warnings": [...], "vendor": [...]}.
 
-    restricted：许可语境权利限制短语命中（severity=high，需用户显式确认）；
-    warnings：README 正文命中（降级警告）；
-    vendor：厂商元数据信号（severity=notice，同样需用户显式确认）。
-    extra_license：额外的许可语境字符串 [(文件标签, context, 值)]——方言 manifest
-    （如 .codex-plugin/plugin.json）的 license 字段不在顶层文件名扫描范围内，由
-    调用方解析后传入。"""
+    restricted: restriction phrase hits in license contexts (severity=high, requires confirmation);
+    warnings: README body hits (downgraded to warnings);
+    vendor: vendor metadata signals (severity=notice, also requires confirmation).
+    extra_license: additional license-context tuples [(file_label, context, value)] for dialect
+    manifests (e.g. .codex-plugin/plugin.json) parsed by the caller."""
     src = str(src)
     restricted, warnings, vendor = [], [], []
 
-    # 1. 许可语境文件：LICENSE*/COPYING*/NOTICE*（含已知开源许可标记的跳过短语扫描）
+    # 1. License-context files: LICENSE*/COPYING*/NOTICE* (skip phrase scan if known OSS markers present)
     try:
         entries = sorted(os.listdir(src))
     except OSError:
@@ -202,7 +213,7 @@ def scan_rights(src, extra_license=None):
                 continue
             _collect_phrase_hits(text, name, "readme-body", warnings)
 
-    # 2. manifest 的 license 字段 + 厂商 author/publisher/URL 信号
+    # 2. Manifest license fields + vendor author/publisher/URL signals
     for name, meta in _manifest_dicts(src):
         lic = meta.get("license")
         if isinstance(lic, dict):
@@ -228,16 +239,16 @@ def scan_rights(src, extra_license=None):
                     vendor.append({"signal": "vendor-url", "value": hit,
                                    "source": f"{name}:{field}"})
 
-    # 2b. 方言 manifest 的 license 值（调用方解析传入）
+    # 2b. Dialect manifest license values passed by caller
     for label, context, value in extra_license or []:
         if isinstance(value, str) and value:
             _collect_phrase_hits(value, label, context, restricted)
 
-    # 3. SKILL.md frontmatter 的 license 字段
+    # 3. SKILL.md frontmatter license fields
     for rel, lic in _skill_frontmatter_license(src):
         _collect_phrase_hits(lic, rel, "skill-frontmatter-license", restricted)
 
-    # 4. git remote URL 厂商信号
+    # 4. git remote URL vendor signal
     git_cfg = _read_bounded(os.path.join(src, ".git", "config"))
     if git_cfg:
         m = re.search(r'\[remote "origin"\][^\[]*?url\s*=\s*(\S+)', git_cfg)
@@ -246,13 +257,13 @@ def scan_rights(src, extra_license=None):
             if hit:
                 vendor.append({"signal": "vendor-url", "value": hit, "source": ".git/config"})
 
-    # 5. 来源路径特征
+    # 5. Source path components
     for part in Path(src).parts:
         low = part.lower()
         if low in VENDOR_PATH_COMPONENTS:
             vendor.append({"signal": "vendor-path", "value": low, "source": str(src)})
 
-    # 6. 代码签名检查点（可空跑）
+    # 6. Code-signing hook (no-op)
     sig = signing_org_signal(src)
     if sig:
         vendor.append(sig)
@@ -261,7 +272,7 @@ def scan_rights(src, extra_license=None):
 
 
 def severity_of(rights):
-    """命中分级：许可短语 → high；仅厂商信号 → notice；全干净 → None。"""
+    """Classify severity: license phrase hits -> 'high'; vendor signals only -> 'notice'; clean -> None."""
     if not rights:
         return None
     if rights.get("restricted"):
@@ -272,8 +283,8 @@ def severity_of(rights):
 
 
 def detect_license(src, meta_license=""):
-    """优先用原包 metadata 的 license；否则粗看 LICENSE 文件头；都拿不到就 UNKNOWN。
-    绝不把外部内容默认标成 MIT / 本开发者原创。"""
+    """Prefer license from package metadata; otherwise inspect LICENSE file header; else UNKNOWN.
+    Never default external content to MIT or local-developer attribution."""
     if meta_license:
         return meta_license
     for name in ("LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"):
@@ -296,17 +307,17 @@ def detect_license(src, meta_license=""):
 
 
 def main():
-    # 中文输出钉死 UTF-8：Windows GBK locale + 管道捕获下 print 会 UnicodeEncodeError
+    # Force UTF-8 stdio to avoid UnicodeEncodeError under Windows GBK locale with piped stdout
     pc.reconfigure_stdio_utf8()
     ap = argparse.ArgumentParser(
-        description="权利限制扫描：外部插件源目录的许可短语与厂商/平台信号检查")
-    ap.add_argument("source", help="待扫描的源目录")
+        description="Rights-restriction scan: check external plugin sources for restrictive license phrases and vendor/platform signals")
+    ap.add_argument("source", help="Source directory to scan")
     ap.add_argument("--confirm-rights", action="store_true",
-                    help="命中权利限制关键词或厂商/平台信号时，显式确认有权安装/登记后继续")
+                    help="Explicitly confirm right to install/register when restriction phrases or vendor signals match")
     a = ap.parse_args()
     src = Path(a.source).expanduser().resolve()
     if not src.is_dir():
-        print(json.dumps({"success": False, "error": f"source 不是目录: {src}"},
+        print(json.dumps({"success": False, "error": f"source is not a directory: {src}"},
                          ensure_ascii=False), file=sys.stderr)
         sys.exit(2)
 
@@ -315,8 +326,8 @@ def main():
     status = "clear"
     if severity and a.confirm_rights:
         status = "confirmed-by-user"
-        print(f"权利扫描：severity={severity}，用户已通过 --confirm-rights 显式确认"
-              "（继续即视为用户已自行确认并承担相应责任）。", file=sys.stderr)
+        print(f"Rights scan: severity={severity}, explicitly confirmed via --confirm-rights "
+              "(continuing means the user accepts responsibility).", file=sys.stderr)
     elif severity:
         status = "needs-confirmation"
 
@@ -326,19 +337,19 @@ def main():
                       "warnings": rights["warnings"],
                       "signals": rights["vendor"]}, ensure_ascii=False, indent=2))
     for w in rights["warnings"]:
-        print(f"权利扫描警告（README 正文命中，仅提示不拒绝）: "
+        print(f"Rights scan warning (README body hit, informational only): "
               f"{w['category']} @ {w['file']}", file=sys.stderr)
     if status == "needs-confirmation":
         if severity == "high":
             cats = ", ".join(sorted({m["category"] for m in rights["restricted"]}))
             print(RIGHTS_RISK_NOTICE.format(categories=cats), file=sys.stderr)
-            print("命中明细 → " + "; ".join(
-                f"{m['category']} @ {m['file']}（{m['context']}）"
+            print("Match details -> " + "; ".join(
+                f"{m['category']} @ {m['file']} ({m['context']})"
                 for m in rights["restricted"]), file=sys.stderr)
         else:
             print(RIGHTS_CONFIRM_NOTICE, file=sys.stderr)
         print(INSTALL_SAFETY_NOTICE, file=sys.stderr)
-        print("确认有权登记后重跑时加 --confirm-rights。", file=sys.stderr)
+        print("Re-run with --confirm-rights after confirming you have the right to register.", file=sys.stderr)
         sys.exit(7)
 
 

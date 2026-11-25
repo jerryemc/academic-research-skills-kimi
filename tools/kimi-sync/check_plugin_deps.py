@@ -1,45 +1,49 @@
 #!/usr/bin/env python3
-"""check_plugin_deps.py — 审计 Kimi 插件的依赖可用性（「真正可用性」检查，validate_plugin.py 的加深口径）。
+"""check_plugin_deps.py — Audit Kimi plugin dependency usability (deeper runtime check beyond validate_plugin.py).
 
-validate_plugin.py 只查 manifest 结构与组件路径存在性；本脚本回答「这个插件装上能不能跑起来」：
+validate_plugin.py only checks manifest structure and component path existence; this script
+answers whether the plugin will actually run once installed:
 
-判定基准（本项目运行时能提供的能力）：
-  - 内置工具（kimi-code agent-core tools/builtin 及 background/、cron/）：Bash / Read / Write /
+Baseline (capabilities provided by this runtime):
+  - Built-in tools (kimi-code agent-core tools/builtin, background/, cron/): Bash / Read / Write /
     Edit / Glob / Grep / ReadMediaFile / FetchURL / WebSearch / Agent / AgentSwarm /
     AskUserQuestion / Skill / TodoList / EnterPlanMode / ExitPlanMode / CreateGoal / GetGoal /
     SetGoalBudget / UpdateGoal / CronCreate / CronDelete / CronList / TaskList / TaskOutput /
-    TaskStop。
-    skill/commands/agents 的 .md 正文只是提示词，提到的工具名若不在上表且没有对应能力，
-    agent 无法照字面调用（记 warning；WebFetch→FetchURL、TodoWrite→TodoList、Task→Agent
-    这类有对应能力的也记 warning 提示名称差异）。
-  - skill 里「调用命令」最终都走 Bash，所以 CLI 依赖是否可用 = 本机存在或有公开安装方式。
+    TaskStop.
+    Markdown bodies in skills/commands/agents are prompts; tool names not in the list above and
+    without an equivalent cannot be called literally by the agent (logged as a warning; mapped
+    names like WebFetch->FetchURL, TodoWrite->TodoList, Task->Agent also log a warning noting
+    the name difference).
+  - Commands invoked by skills go through Bash, so CLI availability means present locally or
+    installable via a public registry.
 
-检查项：
-  A. mcpServers（硬依赖，起不来该插件核心能力就缺失）：
-     - URL 型：--online 时探测可达性；连接失败/DNS 失败/404 → blocker；401/403/405 → 活（需鉴权记 warning）。
-     - stdio 型：
-       * command 为 ./ 相对路径或含 / 的相对路径 → 插件内文件必须存在；
-       * command 为解释器/启动器（python3/python/node/npx/uvx/uv/deno/bun/bash/sh/env）→
-         args 里 ./ 开头的插件内脚本必须存在；npx/uvx/uv 后的包名 --online 查
-         npm registry / PyPI，不存在 → blocker；
-       * 其他裸命令（unforgit-mcp、tessl 等）→ 本机 PATH 没有时查 npm registry，
-         registry 也没有 → blocker；registry 有 → warning「需先安装」；
-       * 占位符（__CONFIGURED_BY_INSTALLER__ 等全大写占位）→ blocker「需安装器配置」；
-       * powershell.exe / pwsh → 仅 Windows 平台，桌面端起不来 → blocker。
-     - env 里的 ${VAR} → warning「需配置环境变量」。
-  B. hooks/commands：command 字符串里 ./ 开头的插件内路径必须存在，不存在 → blocker。
-  C. skills/commands/agents 的 .md 正文：
-     - mcp__<server>__<tool> 引用：server 必须在 manifest mcpServers 里声明，否则 → blocker；
-     - 提到 Claude/Codex 生态工具名 → 按上面的映射/无对应口径记 warning。
-  D. 配套安装：插件根有 package.json 且 MCP/脚本引用本地 node 脚本 → warning「需 npm install」；
-     有 setup.sh → warning「需先运行 setup.sh 安装本体」。
+Checks:
+  A. mcpServers (hard dependency; core capability is missing if it cannot start):
+     - URL-based: probe reachability when online; connection/DNS failure or 404 -> blocker;
+       401/403/405 -> alive (auth required logged as warning).
+     - stdio-based:
+       * command is a ./ or relative path containing / -> file must exist in plugin dir;
+       * command is an interpreter/launcher (python3/python/node/npx/uvx/uv/deno/bun/bash/sh/env) ->
+         ./-prefixed scripts in args must exist in plugin dir; package names after npx/uvx/uv are
+         checked against npm registry / PyPI when online, missing -> blocker;
+       * other bare commands (unforgit-mcp, tessl, etc.) -> if not on PATH, check npm/PyPI;
+         absent there too -> blocker; present in registry -> warning ("needs installation");
+       * placeholders (all-caps like __CONFIGURED_BY_INSTALLER__) -> blocker ("needs installer config");
+       * powershell.exe / pwsh -> Windows-only, cannot run on desktop -> blocker.
+     - ${VAR} in env -> warning ("environment variable must be configured").
+  B. hooks/commands: ./-prefixed paths inside command strings must exist in plugin dir, else -> blocker.
+  C. Markdown bodies in skills/commands/agents:
+     - mcp__<server>__<tool> references: server must be declared in manifest mcpServers, else -> warning;
+     - mentions of Claude/Codex ecosystem tool names -> warning per mapping above.
+  D. Companion setup: package.json in plugin root with local node MCP script -> warning ("needs npm install");
+     setup.sh present -> warning ("must run setup.sh first").
 
-输出：每个插件 {name, usable, blockers, warnings}；blocker 非空即「不可用」。
-判定口径：以「register-personal 登记 + 客户端「个人」页签安装」的标准安装路径为准
-（daimon 个人市场无 mcpServers 限制）；客户端「从文件安装」（侧载）对 MCP 的限制
-只是侧载自身约束，不纳入本脚本的可用性判定。
-用法：
-  python3 check_plugin_deps.py <plugins父目录或单个插件目录> [--offline] [--json <path>]
+Output: per-plugin {name, usable, blockers, warnings}; non-empty blockers means unusable.
+Scope: evaluated against the standard "register-personal + Personal tab install" path
+(daimon personal marketplace has no mcpServers restriction); sideload ("install from file")
+MCP restrictions are a sideload-only constraint and excluded here.
+Usage:
+  python3 check_plugin_deps.py <plugins-parent-dir-or-single-plugin-dir> [--offline] [--json <path>]
 """
 import json, os, re, shutil, subprocess, sys, time, urllib.request, urllib.error
 from pathlib import Path
@@ -47,9 +51,9 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plugin_common as pc
 
-# ---- 本项目运行时内置工具（判定基准声明；对照来源：kimi-code
-# packages/agent-core/src/tools/builtin/index.ts 及其 background/、cron/ 目录，
-# 新增工具时同步更新）----
+# ---- Runtime built-in tools baseline (source: kimi-code
+# packages/agent-core/src/tools/builtin/index.ts plus background/ and cron/;
+# keep in sync when new tools are added) ----
 KIMI_BUILTIN_TOOLS = {
     "Bash", "Read", "Write", "Edit", "Glob", "Grep", "ReadMediaFile",
     "FetchURL", "WebSearch", "Agent", "AgentSwarm", "AskUserQuestion", "Skill",
@@ -58,7 +62,7 @@ KIMI_BUILTIN_TOOLS = {
     "CronCreate", "CronDelete", "CronList", "TaskList", "TaskOutput", "TaskStop",
 }
 
-# Claude/Codex 生态工具名 → Kimi 对应能力（有对应记 warning 名称差异；无对应记 warning 无此能力）
+# Claude/Codex ecosystem tool names -> Kimi equivalents (mapped -> name-diff warning; None -> unsupported warning)
 TOOL_NAME_EQUIVALENTS = {
     "WebFetch": "FetchURL", "TodoWrite": "TodoList", "Task": "Agent",
     "NotebookRead": "Read", "NotebookEdit": "Edit", "BashOutput": None,
@@ -66,16 +70,16 @@ TOOL_NAME_EQUIVALENTS = {
     "ReadMcpResource": None, "WebSearch": "WebSearch",
 }
 
-# 标准解释器/启动器（desktop 环境必有或有官方安装方式；uv/docker/bun/deno 需先装，记 warning）
+# Standard interpreters/launchers (expected on desktop or officially installable; uv/docker/bun/deno warn if missing)
 INTERPRETERS_OK = {"python3", "python", "node", "npx", "bash", "sh", "env"}
-INSTALLABLE_LAUNCHERS = {"uvx": "uv（https://docs.astral.sh/uv/）", "uv": "uv（https://docs.astral.sh/uv/）",
+INSTALLABLE_LAUNCHERS = {"uvx": "uv (https://docs.astral.sh/uv/)", "uv": "uv (https://docs.astral.sh/uv/)",
                          "docker": "Docker", "bun": "Bun", "deno": "Deno"}
 WINDOWS_ONLY_COMMANDS = {"powershell.exe", "powershell", "pwsh.exe", "cmd.exe"}
 
 PLACEHOLDER_RE = re.compile(r"^__[A-Z_]+__$")
 ENV_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 MCP_TOOL_REF_RE = re.compile(r"mcp__([A-Za-z0-9_-]+)__")
-# 正文里提到的工具名：单词边界精确匹配预置清单（避免误报普通英文词）
+# Tool mentions in markdown: exact word-boundary match against preset list to avoid false positives
 TOOL_MENTION_RE = re.compile(r"\b(WebFetch|TodoWrite|Task|NotebookEdit|NotebookRead|BashOutput|"
                              r"KillShell|SlashCommand|ListMcpResources|ReadMcpResource)\b")
 
@@ -95,7 +99,7 @@ def npm_package_exists(name):
             ok = resp.status == 200
     except urllib.error.HTTPError as e:
         ok = e.code != 404
-    except Exception:  # noqa: BLE001 — 网络异常不算「不存在」，跳过该项判定
+    except Exception:  # noqa: BLE001 — network errors do not prove non-existence; skip check
         ok = None
     _NPM_CACHE[name] = ok
     return ok
@@ -128,21 +132,21 @@ def url_alive(url):
                 alive = resp.status
             break
         except urllib.error.HTTPError as e:
-            alive = e.code  # 401/403/405 都算服务在线
+            alive = e.code  # 401/403/405 still mean the service is online
             break
-        except Exception:  # noqa: BLE001 — DNS/连接失败/超时等网络层问题
+        except Exception:  # noqa: BLE001 — DNS/connection/timeout network-layer errors
             alive = 0
             if attempt == 1:
-                # 瞬时网络抖动重试一次：批量转换联网核实量大，单次超时不该
-                # 直接把可用插件误判成「URL 不可达」（真实宕机第二次也会失败）
+                # Retry once for transient network jitter during large batch checks so a
+                # single timeout doesn't flag a working plugin as unreachable.
                 time.sleep(1)
     _URL_CACHE[url] = alive
     return alive
 
 
 def strip_version_spec(pkg):
-    """包名参数去掉版本后缀：pkg@1.2.3 → pkg；@scope/name@1.2.3 → @scope/name；
-    pkg==1.2.3（uvx/pip 形式）→ pkg。"""
+    """Strip version suffix from package arg: pkg@1.2.3 -> pkg; @scope/name@1.2.3 -> @scope/name;
+    pkg==1.2.3 (uvx/pip form) -> pkg."""
     if pkg.startswith("@"):
         head, _, _ver = pkg.rpartition("@")
         return head or pkg
@@ -152,7 +156,7 @@ def strip_version_spec(pkg):
 
 
 def first_npx_package(args):
-    """npx args 里第一个非 flag 的 token 是包名；-p/--package 的值也算。"""
+    """Return the first non-flag token in npx args (or the value of -p/--package)."""
     i = 0
     while i < len(args):
         a = args[i]
@@ -169,7 +173,7 @@ def first_npx_package(args):
 
 
 def first_uv_package(args):
-    """uv run <pkg> / uv tool run <pkg> / uvx <pkg>：取子命令后第一个非 flag token。"""
+    """For `uv run <pkg>`, `uv tool run <pkg>`, or `uvx <pkg>`: first non-flag token after subcommand."""
     rest = list(args)
     if rest and rest[0] == "tool":
         rest = rest[1:]
@@ -182,7 +186,7 @@ def first_uv_package(args):
 
 
 def rel_paths_in_command(command):
-    """命令字符串里 ./ 开头的相对路径 token（去引号）。"""
+    """Extract ./-prefixed relative path tokens from a command string (unquoted)."""
     out = []
     for tok in re.split(r"\s+", command):
         tok = tok.strip('"\'').rstrip(";&|")
@@ -195,75 +199,75 @@ def check_mcp_server(plugin_dir, sname, cfg, online, blockers, warnings):
     if cfg.get("url"):
         url = cfg["url"]
         if re.match(r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)([:/]|$)", url):
-            warnings.append(f"MCP server {sname!r} 指向本机回环地址，需用户先在本地部署该服务: {url}")
+            warnings.append(f"MCP server {sname!r} points to a loopback address; user must run the service locally: {url}")
             return
         if online:
             status = url_alive(url)
             if status in (0, None):
-                blockers.append(f"MCP server {sname!r} 的 URL 不可达: {url}")
+                blockers.append(f"MCP server {sname!r} URL is unreachable: {url}")
             elif status == 404:
-                blockers.append(f"MCP server {sname!r} 的 URL 返回 404: {url}")
+                blockers.append(f"MCP server {sname!r} URL returned 404: {url}")
             elif status in (401, 403):
-                warnings.append(f"MCP server {sname!r} 的 URL 需要鉴权（HTTP {status}）: {url}")
+                warnings.append(f"MCP server {sname!r} URL requires authentication (HTTP {status}): {url}")
         return
     command = cfg.get("command") or ""
     args = cfg.get("args") if isinstance(cfg.get("args"), list) else []
     if PLACEHOLDER_RE.match(command) or any(PLACEHOLDER_RE.match(str(a)) for a in args):
-        blockers.append(f"MCP server {sname!r} 的启动命令是未配置占位符: {command}")
+        blockers.append(f"MCP server {sname!r} command is an unconfigured placeholder: {command}")
         return
     base = os.path.basename(command)
     if base.lower() in WINDOWS_ONLY_COMMANDS:
-        blockers.append(f"MCP server {sname!r} 的启动命令仅 Windows 可用: {command}")
+        blockers.append(f"MCP server {sname!r} command is Windows-only: {command}")
         return
-    # 插件内相对路径命令（normpath 归一尾斜杠/正斜杠：\\?\ 前缀路径不做斜杠转换）
+    # Plugin-relative command path (normpath normalizes slashes; \\?\ paths skip slash conversion)
     if command.startswith("./") or ("/" in command and not os.path.isabs(command)):
         if not os.path.isfile(os.path.normpath(os.path.join(plugin_dir, command))):
-            blockers.append(f"MCP server {sname!r} 的启动文件在插件目录里不存在: {command}")
+            blockers.append(f"MCP server {sname!r} executable does not exist in plugin dir: {command}")
         return
     if base in INTERPRETERS_OK:
-        pass  # 解释器本身没问题，继续查 args
+        pass  # Interpreter itself is fine; continue checking args
     elif base in INSTALLABLE_LAUNCHERS:
         if not shutil.which(base):
-            warnings.append(f"MCP server {sname!r} 需要先安装 {INSTALLABLE_LAUNCHERS[base]}")
+            warnings.append(f"MCP server {sname!r} requires installing {INSTALLABLE_LAUNCHERS[base]} first")
     else:
-        # 生僻裸命令：本机 PATH → npm/PyPI（命令名与插件名都试，包名常与命令名不同，
-        # 如 npm 包 unforgit 提供 unforgit-mcp 命令）逐级判定
+        # Uncommon bare command: check local PATH -> npm/PyPI (try both command and plugin name,
+        # since package names often differ from bin names, e.g. npm package unforgit provides unforgit-mcp)
         if shutil.which(command):
             pass
         elif not online:
-            warnings.append(f"MCP server {sname!r} 的启动命令 {command!r} 本机不存在，"
-                            f"未能在线核实（--offline）")
+            warnings.append(f"MCP server {sname!r} command {command!r} not found locally; "
+                            f"skipped online lookup (--offline)")
         else:
             plugin_name = os.path.basename(plugin_dir)
             npm_hit = next((c for c in (command, plugin_name) if npm_package_exists(c)), None)
             pypi_hit = next((c for c in (command, plugin_name) if pypi_package_exists(c)), None)
             if npm_hit:
-                warnings.append(f"MCP server {sname!r} 需要先全局安装 npm 包 {npm_hit}"
-                                f"（提供 {command} 命令）")
+                warnings.append(f"MCP server {sname!r} requires global npm package {npm_hit} "
+                                f"(provides {command})")
             elif pypi_hit:
-                warnings.append(f"MCP server {sname!r} 需要先安装 PyPI 包 {pypi_hit}"
-                                f"（提供 {command} 命令）")
+                warnings.append(f"MCP server {sname!r} requires PyPI package {pypi_hit} "
+                                f"(provides {command})")
             else:
-                blockers.append(f"MCP server {sname!r} 的启动命令 {command!r} 无法确认公开安装途径"
-                                f"（本机 PATH、npm、PyPI 均无；如源仓库提供安装脚本/Release 需手动安装）")
-    # args 里的插件内脚本
+                blockers.append(f"MCP server {sname!r} command {command!r} has no verifiable public install path "
+                                f"(not on PATH, npm, or PyPI; manual install from source repo/release required)")
+    # Plugin-relative scripts in args
     for a in args:
         a = str(a)
         if a.startswith("./") and not os.path.exists(os.path.normpath(os.path.join(plugin_dir, a))):
-            blockers.append(f"MCP server {sname!r} 引用的路径在插件目录里不存在: {a}")
-    # npx/uvx/uv 包名 registry 核实
+            blockers.append(f"MCP server {sname!r} references missing path in plugin dir: {a}")
+    # Verify npx/uvx/uv package names against registries
     if online and base == "npx":
         pkg = first_npx_package(args)
         if pkg and npm_package_exists(pkg) is False:
-            blockers.append(f"MCP server {sname!r} 的 npm 包在 registry 不存在: {pkg}")
+            blockers.append(f"MCP server {sname!r} npm package not found in registry: {pkg}")
     if online and base in ("uvx", "uv"):
         pkg = first_uv_package(args)
         if pkg and not pkg.startswith(".") and "/" not in pkg \
                 and pypi_package_exists(pkg) is False:
-            blockers.append(f"MCP server {sname!r} 的 PyPI 包不存在: {pkg}")
+            blockers.append(f"MCP server {sname!r} PyPI package not found: {pkg}")
     for k, v in (cfg.get("env") or {}).items():
         for var in ENV_VAR_RE.findall(str(v)):
-            warnings.append(f"MCP server {sname!r} 需要配置环境变量 {var}")
+            warnings.append(f"MCP server {sname!r} requires environment variable {var}")
 
 
 def check_plugin(plugin_dir, online=True):
@@ -271,7 +275,7 @@ def check_plugin(plugin_dir, online=True):
     blockers, warnings = [], []
     mf = os.path.join(plugin_dir, "kimi.plugin.json")
     if not os.path.isfile(mf):
-        return {"name": name, "usable": False, "blockers": ["缺 kimi.plugin.json"], "warnings": []}
+        return {"name": name, "usable": False, "blockers": ["missing kimi.plugin.json"], "warnings": []}
     m = json.load(open(mf, encoding="utf-8"))
 
     for sname, cfg in (m.get("mcpServers") or {}).items():
@@ -282,9 +286,9 @@ def check_plugin(plugin_dir, online=True):
         cmd = h.get("command", "") if isinstance(h, dict) else ""
         for p in rel_paths_in_command(cmd):
             if not os.path.exists(os.path.normpath(os.path.join(plugin_dir, p))):
-                blockers.append(f"hook（{h.get('event')}）引用的文件在插件目录里不存在: {p}")
+                blockers.append(f"hook ({h.get('event')}) references missing file in plugin dir: {p}")
 
-    # .md 正文扫描：skills/commands/agents + 根 SKILL.md
+    # Scan markdown bodies: skills/commands/agents + root SKILL.md
     md_files = []
     for field in ("skills", "commands", "agents"):
         raw = m.get(field)
@@ -312,36 +316,36 @@ def check_plugin(plugin_dir, online=True):
                       for part in rel.split(os.sep))
         if not in_docs:
             for server in set(MCP_TOOL_REF_RE.findall(text)):
-                # mcp__<server>__<tool>：提示词里引用未声明的 MCP server——agent 运行时
-                # 会发现工具不存在并自然降级，记 warning 提示用户可能需要自行配置
+                # mcp__<server>__<tool>: prompt references an undeclared MCP server; the agent
+                # will gracefully degrade at runtime, so warn that user setup may be needed.
                 if server not in declared_servers and server != m.get("name"):
-                    warnings.append(f"{rel} 提到未在本插件声明的 MCP server mcp__{server}__*"
-                                    f"（若流程强依赖它，需用户自行配置该 server）")
+                    warnings.append(f"{rel} references undeclared MCP server mcp__{server}__* "
+                                    f"(configure this server manually if required)")
         for tool in set(TOOL_MENTION_RE.findall(text)):
             if tool in seen_tool_notes:
                 continue
             seen_tool_notes.add(tool)
             equiv = TOOL_NAME_EQUIVALENTS.get(tool)
             if equiv:
-                warnings.append(f"{rel} 提到工具 {tool}（Kimi 对应能力为 {equiv}，名称不同不影响使用）")
+                warnings.append(f"{rel} mentions tool {tool} (Kimi equivalent is {equiv}; name difference is harmless)")
             else:
-                warnings.append(f"{rel} 提到工具 {tool}（Kimi 内置工具集中没有对应能力）")
+                warnings.append(f"{rel} mentions tool {tool} (no equivalent in Kimi built-in tools)")
 
     if os.path.isfile(os.path.join(plugin_dir, "package.json")):
         uses_local_node = any(
             (c.get("command") == "node" and any(str(a).startswith("./") for a in (c.get("args") or [])))
             for c in (m.get("mcpServers") or {}).values() if isinstance(c, dict))
         if uses_local_node and not os.path.isdir(os.path.join(plugin_dir, "node_modules")):
-            warnings.append("含 package.json 且 MCP 用本地 node 脚本，需先在插件目录 npm install")
+            warnings.append("contains package.json and local node MCP script; run npm install in plugin dir first")
     if os.path.isfile(os.path.join(plugin_dir, "setup.sh")):
-        warnings.append("含 setup.sh，需先运行它安装插件本体/依赖")
+        warnings.append("contains setup.sh; run it first to install plugin binaries/dependencies")
 
     return {"name": m.get("name", name), "usable": not blockers,
             "blockers": blockers, "warnings": sorted(set(warnings))}
 
 
 def main():
-    # 中文输出钉死 UTF-8：Windows GBK locale + 管道捕获下 print 会 UnicodeEncodeError
+    # Force UTF-8 stdio to avoid UnicodeEncodeError under Windows GBK locale with piped stdout
     pc.reconfigure_stdio_utf8()
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     online = "--offline" not in sys.argv
@@ -350,7 +354,7 @@ def main():
         i = sys.argv.index("--json")
         json_out = sys.argv[i + 1]
     if not args:
-        sys.exit("用法: python3 check_plugin_deps.py <plugins父目录或单个插件目录> [--offline] [--json <path>]")
+        sys.exit("Usage: python3 check_plugin_deps.py <plugins-parent-dir-or-single-plugin-dir> [--offline] [--json <path>]")
     root = args[0]
     if os.path.isfile(os.path.join(root, "kimi.plugin.json")):
         dirs = [root]
@@ -360,9 +364,9 @@ def main():
     results = [check_plugin(d, online=online) for d in dirs]
     usable = [r for r in results if r["usable"]]
     unusable = [r for r in results if not r["usable"]]
-    print(f"共 {len(results)} 个插件：可用 {len(usable)}，不可用 {len(unusable)}")
+    print(f"Total {len(results)} plugins: {len(usable)} usable, {len(unusable)} unusable")
     for r in unusable:
-        print(f"  [不可用] {r['name']}: " + "；".join(r["blockers"]))
+        print(f"  [UNUSABLE] {r['name']}: " + "; ".join(r["blockers"]))
     if json_out:
         Path(json_out).write_text(json.dumps(
             {"total": len(results), "usable": len(usable), "unusable": len(unusable),
