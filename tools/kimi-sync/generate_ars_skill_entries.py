@@ -43,8 +43,20 @@ def _entry_text(name, description, workflow):
         f"Read `{target}` and follow that workflow for the user's request. "
         "Treat the invocation arguments as the requested mode, source material, and output constraints. "
         "Load only the supporting files needed for the current stage.\n"
+        + PATH_NOTE
     )
     return metadata + body
+
+
+# Host-portability note. Kimi Code expands the skill-directory placeholder at
+# load time; other hosts (e.g. Antigravity) leave it literal. The note avoids
+# writing the placeholder itself so that Kimi's substitution cannot garble it.
+PATH_NOTE = (
+    "\nPath resolution: if a path above still contains the literal `KIMI_SKILL_DIR` "
+    "placeholder (the host did not expand it, e.g. Antigravity), treat that placeholder "
+    "as the directory containing this `SKILL.md` file, so `../../ars/` is the plugin's "
+    "`ars/` directory.\n"
+)
 
 
 def _router_text(workflows):
@@ -52,7 +64,8 @@ def _router_text(workflows):
         f"- `{name}`: read `${{KIMI_SKILL_DIR}}/../../ars/{name}/WORKFLOW.md`."
         for name in workflows
     )
-    return ROUTER_TEMPLATE.read_text(encoding="utf-8").replace("{{WORKFLOW_LINKS}}", links)
+    text = ROUTER_TEMPLATE.read_text(encoding="utf-8").replace("{{WORKFLOW_LINKS}}", links)
+    return text.rstrip("\n") + "\n" + PATH_NOTE
 
 
 def _write_and_swap(repo_root, entries):

@@ -13,6 +13,11 @@ from generate_ars_skill_entries import DEFAULT_CONFIG, generate_entries
 
 SOURCE_SKILL = Path("plugins/ars-codex/skills/academic-research-suite")
 SOURCE_MANIFEST = Path("plugins/ars-codex/.codex-plugin/plugin.json")
+ANTIGRAVITY_MANIFEST = Path(".antigravity-plugin/plugin.json")
+
+
+def _backup_name(name):
+    return "previous-" + str(name).replace("/", "__")
 
 
 def _workflows(ars_root):
@@ -47,7 +52,7 @@ def _rollback(repo_root, staging, original_directories, original_metadata):
             shutil.rmtree(target)
     for name, existed in original_metadata.items():
         target = repo_root / name
-        backup = staging / f"previous-{name}"
+        backup = staging / _backup_name(name)
         if existed and backup.is_file():
             shutil.copy2(backup, target)
         elif not existed and target.exists():
@@ -91,9 +96,18 @@ def sync_upstream(repo_root: Path, upstream_repo: Path) -> dict:
             encoding="utf-8",
         )
         (staging / ".upstream-commit").write_text(source_sha + "\n", encoding="utf-8")
+        metadata = ["README.upstream.md", "kimi.plugin.json", ".upstream-commit"]
+        # Keep the optional Antigravity manifest's version in lockstep with Kimi's.
+        antigravity_manifest = repo_root / ANTIGRAVITY_MANIFEST
+        if antigravity_manifest.is_file():
+            ag = json.loads(antigravity_manifest.read_text(encoding="utf-8"))
+            ag["version"] = target_manifest["version"]
+            staged = staging / ANTIGRAVITY_MANIFEST
+            staged.parent.mkdir(parents=True, exist_ok=True)
+            staged.write_text(json.dumps(ag, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            metadata.append(str(ANTIGRAVITY_MANIFEST))
         entry_report = generate_entries(staging, DEFAULT_CONFIG)
 
-        metadata = ("README.upstream.md", "kimi.plugin.json", ".upstream-commit")
         original_directories = {name: (repo_root / name).exists() for name in ("ars", "skills")}
         original_metadata = {name: (repo_root / name).exists() for name in metadata}
         try:
@@ -101,7 +115,7 @@ def sync_upstream(repo_root: Path, upstream_repo: Path) -> dict:
             _replace_directory(repo_root, staging, "skills")
             for name in metadata:
                 if original_metadata[name]:
-                    shutil.copy2(repo_root / name, staging / f"previous-{name}")
+                    shutil.copy2(repo_root / name, staging / _backup_name(name))
                 shutil.copy2(staging / name, repo_root / name)
         except Exception:
             _rollback(repo_root, staging, original_directories, original_metadata)

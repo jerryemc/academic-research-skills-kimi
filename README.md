@@ -1,6 +1,6 @@
-# Academic Research Skills for Kimi
+# Academic Research Skills for Other Agents (Kimi Code · Antigravity)
 
-本仓库是 [Imbad0202/academic-research-skills-codex](https://github.com/Imbad0202/academic-research-skills-codex) 的 Kimi Code / Kimi Code Desktop 下游适配插件。它提供一个总 Router 和六个可独立调用的 Skill 入口，并保留可自动同步的上游工作流内容。
+本仓库是 [Imbad0202/academic-research-skills-codex](https://github.com/Imbad0202/academic-research-skills-codex) 的下游适配插件，同时支持 **Kimi Code / Kimi Code Desktop** 与 **Google Antigravity**（Desktop App / IDE / `agy` CLI）。它提供一个总 Router 和六个可独立调用的 Skill 入口，并保留可自动同步的上游工作流内容。
 
 ## 来源与许可
 
@@ -13,13 +13,32 @@
 
 ## 安装
 
+### Kimi Code
+
 在 Kimi Code 的 **Install custom plugin** 中填入：
 
 ```text
-https://github.com/jerryemc/academic-research-skills-kimi
+https://github.com/jerryemc/academic-research-skills_other-agents
 ```
 
 也可以填入本仓库的本地目录路径。安装或更新后，执行 `/reload` 或新建会话。
+
+### Antigravity
+
+Antigravity 读取 [`.antigravity-plugin/plugin.json`](.antigravity-plugin/plugin.json)，与 Kimi 的 `kimi.plugin.json` 互不干扰，两者共用同一份 `skills/`。
+
+```bash
+git clone https://github.com/jerryemc/academic-research-skills_other-agents.git
+agy plugin install ./academic-research-skills_other-agents
+```
+
+或者把仓库软链接到全局插件目录（开发时修改即时生效）：
+
+```bash
+ln -s /path/to/academic-research-skills_other-agents ~/.gemini/config/plugins/academic-research-skills
+```
+
+安装后在 Desktop App 的 **Customizations → Installed** 中可见，七个入口可直接用斜杠命令调用，例如 `/academic-research-suite`、`/deep-research`、`/academic-paper`。
 
 ## 两种调用方式
 
@@ -28,6 +47,8 @@ https://github.com/jerryemc/academic-research-skills-kimi
 ```text
 /skill:academic-research-skills:academic-research-suite 我想系统审阅这篇论文
 ```
+
+（Antigravity 中为 `/academic-research-suite 我想系统审阅这篇论文`。）
 
 总入口先应用路由规则，再读取一个工作流及其当前阶段所需的支持文件。
 
@@ -63,6 +84,8 @@ tools/kimi-sync/
 ```
 
 - 独立入口只引用 `ars/<workflow>/WORKFLOW.md`，不复制工作流正文。
+- 入口中的 `${KIMI_SKILL_DIR}` 由 Kimi Code 展开；生成器同时写入一段路径回退说明，让不展开该变量的宿主（如 Antigravity）按 `SKILL.md` 所在目录解析 `../../ars/`。
+- 同步器会让 `.antigravity-plugin/plugin.json` 的 `version` 与 `kimi.plugin.json` 保持一致。
 - `ars/` 和生成后的 `skills/` 都提交到仓库，安装时无需构建。
 - **不要手工修改生成的 `skills/*/SKILL.md`**；修改映射或模板后重新运行生成器。
 - 上游只修改工作流正文、references 或 scripts 时，薄入口通常保持不变。
@@ -94,6 +117,7 @@ python3 tools/kimi-sync/sync_ars_codex.py \
 python3 -m pip install pytest pyyaml
 python3 -m pytest tools/kimi-sync/tests -v
 python3 tools/kimi-sync/validate_plugin.py .
+agy plugin validate --strict .   # Antigravity（本地安装了 agy 时）
 ```
 
-发布前还应在 Kimi Code Desktop 从新会话验证七个入口、managed 副本中的资源路径和普通 Write/Edit。
+发布前还应在 Kimi Code Desktop 与 Antigravity 中从新会话验证七个入口、资源路径和普通 Write/Edit。

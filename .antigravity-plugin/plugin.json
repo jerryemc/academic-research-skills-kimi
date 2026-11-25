@@ -1,0 +1,10 @@
+{
+  "name": "academic-research-skills",
+  "version": "3.24.2+kimi.20261116",
+  "description": "Academic research, writing, review, screening, and experiment workflows with one router and six direct skill entrypoints.",
+  "author": "Cheng-I Wu",
+  "homepage": "https://github.com/jerryemc/academic-research-skills_other-agents",
+  "repository": "https://github.com/jerryemc/academic-research-skills_other-agents",
+  "license": "CC-BY-NC-4.0",
+  "keywords": ["academic", "research", "writing", "review", "literature-review", "systematic-review", "peer-review"]
+}

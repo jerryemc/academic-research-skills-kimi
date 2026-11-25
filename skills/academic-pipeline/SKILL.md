@@ -6,3 +6,5 @@ description: "Orchestrator for the full academic research pipeline: research -> 
 # academic-pipeline
 
 Read `${KIMI_SKILL_DIR}/../../ars/academic-pipeline/WORKFLOW.md` and follow that workflow for the user's request. Treat the invocation arguments as the requested mode, source material, and output constraints. Load only the supporting files needed for the current stage.
+
+Path resolution: if a path above still contains the literal `KIMI_SKILL_DIR` placeholder (the host did not expand it, e.g. Antigravity), treat that placeholder as the directory containing this `SKILL.md` file, so `../../ars/` is the plugin's `ars/` directory.

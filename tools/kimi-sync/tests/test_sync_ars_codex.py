@@ -207,3 +207,51 @@ def test_metadata_copy_failure_rolls_back_everything(repo: Path, upstream: Path,
         syncer.sync_upstream(repo, upstream)
 
     assert target_state(repo) == before
+
+
+def test_sync_keeps_antigravity_manifest_version_in_lockstep(repo: Path, upstream: Path):
+    ag_path = repo / ".antigravity-plugin" / "plugin.json"
+    ag_path.parent.mkdir()
+    ag_path.write_text(
+        '{"name":"academic-research-skills","version":"0.1.0","homepage":"https://example.com"}\n',
+        encoding="utf-8",
+    )
+
+    syncer.sync_upstream(repo, upstream)
+
+    kimi = json.loads((repo / "kimi.plugin.json").read_text(encoding="utf-8"))
+    ag = json.loads(ag_path.read_text(encoding="utf-8"))
+    assert ag["version"] == kimi["version"]
+    assert ag["version"].startswith("3.24.0+kimi.")
+    assert ag["homepage"] == "https://example.com"
+    assert not list(repo.glob(".ars-codex-sync-*"))
+
+
+def test_sync_without_antigravity_manifest_does_not_create_one(repo: Path, upstream: Path):
+    syncer.sync_upstream(repo, upstream)
+
+    assert not (repo / ".antigravity-plugin").exists()
+
+
+def test_antigravity_manifest_copy_failure_rolls_back(repo: Path, upstream: Path, monkeypatch):
+    ag_path = repo / ".antigravity-plugin" / "plugin.json"
+    ag_path.parent.mkdir()
+    ag_path.write_text('{"name":"academic-research-skills","version":"0.1.0"}\n', encoding="utf-8")
+    syncer.sync_upstream(repo, upstream)
+    before = target_state(repo)
+    before_ag = ag_path.read_bytes()
+    change_upstream_body(upstream)
+    original_copy2 = syncer.shutil.copy2
+
+    def fail_ag_copy(source, destination, *args, **kwargs):
+        if Path(destination) == ag_path:
+            raise OSError("injected antigravity manifest copy failure")
+        return original_copy2(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(syncer.shutil, "copy2", fail_ag_copy)
+
+    with pytest.raises(OSError, match="injected antigravity manifest copy failure"):
+        syncer.sync_upstream(repo, upstream)
+
+    assert target_state(repo) == before
+    assert ag_path.read_bytes() == before_ag

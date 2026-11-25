@@ -79,6 +79,18 @@ def test_generates_router_and_six_thin_entries(repo: Path):
         assert "${KIMI_SKILL_DIR}/../../ars/" + name + "/WORKFLOW.md" in router
 
 
+def test_entries_carry_host_neutral_path_fallback(repo: Path):
+    generator.generate_entries(repo, config_for(repo))
+
+    for name in WORKFLOWS + [ROUTER]:
+        text = (repo / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        body = text.split("---", 2)[2]
+        assert generator.PATH_NOTE in body
+        # The fallback note must not itself contain the expandable placeholder.
+        assert "${KIMI_SKILL_DIR}" not in generator.PATH_NOTE
+        assert "Kimi Code's available tools" not in body
+
+
 def test_workflow_body_update_leaves_entry_bytes_unchanged(repo: Path):
     generator.generate_entries(repo, config_for(repo))
     before = {

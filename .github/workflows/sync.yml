@@ -58,7 +58,7 @@ jobs:
         run: |
           python -m pytest tools/kimi-sync/tests -v
           python tools/kimi-sync/validate_plugin.py .
-
+          python -c "import json; m = json.load(open('.antigravity-plugin/plugin.json')); k = json.load(open('kimi.plugin.json')); assert m['version'] == k['version'], 'Antigravity manifest version drift'"
       - name: Commit sync branch
         if: steps.source.outputs.changed == 'true'
         env:
